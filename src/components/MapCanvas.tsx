@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId } from 'react';
 import {
   Compass,
   ZoomIn,
@@ -14,8 +14,18 @@ import {
   MoreHorizontal,
   ChevronDown,
   X,
+  Layers,
+  Box,
+  Eye,
+  Crosshair,
+  Target,
+  Plane,
+  Ship,
+  Truck,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
-import { ActiveTool, DrawingToolType, LayoutMode, MapObject, ThemeMode } from '../types';
+import { ActiveTool, BasemapMode, DrawingToolType, LayoutMode, MapObject, ThemeMode } from '../types';
 
 interface MapCanvasProps {
   theme: ThemeMode;
@@ -43,22 +53,69 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   isAudience = false,
   showLocationDot = true,
 }) => {
+  // Navigation & Viewport State
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [bearing, setBearing] = useState(0);
 
-  // Toggle for floating cards from the uploaded UI image
-  const [showMembersCard, setShowMembersCard] = useState(true);
-  const [showInsetCard, setShowInsetCard] = useState(true);
+  // 2.5D Sand-Table Perspective state (matching user's reference image)
+  const [is3DMode, setIs3DMode] = useState(true);
+  const [pitch, setPitch] = useState(30); // 30° tilt angle like the photo
+  const [basemap, setBasemap] = useState<BasemapMode>('aerial');
+
+  // Floating HUD Panels from reference image
+  const [showSymbolPalette, setShowSymbolPalette] = useState(true);
+  const [selectedPaletteSymbol, setSelectedPaletteSymbol] = useState<string | null>(null);
+  const [showMembersCard, setShowMembersCard] = useState(false);
+  const [showInsetCard, setShowInsetCard] = useState(false);
+
+  // Layer Visibility Overlays
+  const [layerArrows, setLayerArrows] = useState(true);
+  const [layerUnits, setLayerUnits] = useState(true);
+  const [layerZones, setLayerZones] = useState(true);
+  const [layerGrid, setLayerGrid] = useState(true);
+
+  // Active placed tactical markers state (for interactivity)
+  const [placedSymbols, setPlacedSymbols] = useState<
+    Array<{ id: string; x: number; y: number; category: string; label: string; color: string }>
+  >([
+    { id: 'u_1', x: 260, y: 390, category: 'Land', label: '1-68 AR', color: '#10B981' },
+    { id: 'u_2', x: 380, y: 440, category: 'Land', label: '2-12 CAV', color: '#3B82F6' },
+    { id: 'u_3', x: 620, y: 260, category: 'Land', label: 'OPFOR HQ', color: '#EF4444' },
+  ]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-
   const isEmerald = theme === 'emerald';
   const isDark = theme === 'dark' || isEmerald;
 
+  // Drag / Pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+    // If placing a symbol from the palette
+    if (selectedPaletteSymbol && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      // Convert to map coordinates (accounting for zoom and pan)
+      const mapX = (clickX - pan.x - rect.width / 2) / zoom + 500;
+      const mapY = (clickY - pan.y - rect.height / 2) / zoom + 325;
+
+      setPlacedSymbols((prev) => [
+        ...prev,
+        {
+          id: `sym_${Date.now()}`,
+          x: Math.round(mapX),
+          y: Math.round(mapY),
+          category: 'Tactical',
+          label: selectedPaletteSymbol,
+          color: isEmerald ? '#10B981' : '#3B82F6',
+        },
+      ]);
+      setSelectedPaletteSymbol(null);
+      return;
+    }
+
     if (activeTool === 'PAN' || activeTool === 'SELECT' || e.button === 1 || isPresenter) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -79,20 +136,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   };
 
   const handleZoom = (delta: number) => {
-    setZoom((prev) => Math.min(Math.max(prev + delta, 0.6), 3.0));
+    setZoom((prev) => Math.min(Math.max(Number((prev + delta).toFixed(2)), 0.6), 3.0));
   };
 
-  const resetBearing = () => {
+  const resetView = () => {
     setBearing(0);
     setPan({ x: 0, y: 0 });
     setZoom(1);
-  };
-
-  // Background color depending on theme
-  const getCanvasBg = () => {
-    if (isEmerald) return 'bg-[#091211]';
-    if (isDark) return 'bg-[#08152e]';
-    return 'bg-[#d8e2ec]';
+    setPitch(30);
   };
 
   return (
@@ -102,703 +153,988 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      className={`relative w-full h-full overflow-hidden select-none cursor-${activeTool === 'PAN' ? 'grab' : 'default'} ${getCanvasBg()}`}
-      style={{ touchAction: 'none' }}
+      className={`relative w-full h-full overflow-hidden select-none cursor-${
+        selectedPaletteSymbol ? 'crosshair' : activeTool === 'PAN' ? 'grab' : 'default'
+      } ${
+        is3DMode
+          ? isEmerald
+            ? 'bg-gradient-to-b from-[#060D0C] via-[#0A1413] to-[#060D0C]'
+            : isDark
+            ? 'bg-gradient-to-b from-[#050E20] via-[#08152E] to-[#050E20]'
+            : 'bg-gradient-to-b from-[#E2E8F0] via-[#CBD5E1] to-[#94A3B8]'
+          : isEmerald
+          ? 'bg-[#091211]'
+          : isDark
+          ? 'bg-[#08152e]'
+          : 'bg-[#d8e2ec]'
+      }`}
+      style={{
+        touchAction: 'none',
+        perspective: is3DMode ? '1200px' : 'none',
+      }}
     >
-      {/* Dynamic Grid / Graticule overlay */}
+      {/* Background Graticule / Dynamic Tactical Grid */}
+      {layerGrid && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-25"
+          style={{
+            backgroundImage: `radial-gradient(circle, ${
+              isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#2A55B0'
+            } 1.2px, transparent 1.2px)`,
+            backgroundSize: '40px 40px',
+            backgroundPosition: `${pan.x}px ${pan.y}px`,
+          }}
+        />
+      )}
+
+      {/* ============================================================== */}
+      {/* 3D TACTICAL SAND-TABLE MAP BOARD (Matches uploaded user image)  */}
+      {/* ============================================================== */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-20"
+        className="w-full h-full absolute inset-0 flex items-center justify-center transition-transform duration-100 ease-out"
         style={{
-          backgroundImage: `radial-gradient(circle, ${
-            isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#2A55B0'
-          } 1px, transparent 1px)`,
-          backgroundSize: '40px 40px',
-          backgroundPosition: `${pan.x}px ${pan.y}px`,
-        }}
-      />
-
-      {/* SVG Vector Map Rendering */}
-      <svg
-        className="w-full h-full absolute inset-0 transition-transform duration-75 ease-out"
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${bearing}deg)`,
+          transform: is3DMode
+            ? `translate3d(${pan.x}px, ${pan.y}px, 0px) rotateX(${pitch}deg) rotateZ(${bearing}deg) scale(${zoom})`
+            : `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom}) rotate(${bearing}deg)`,
           transformOrigin: 'center center',
+          transformStyle: 'preserve-3d',
         }}
-        viewBox="0 0 1000 650"
       >
-        <defs>
-          {/* Gradients */}
-          <linearGradient id="waterGradEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0B1720" />
-            <stop offset="100%" stopColor="#071017" />
-          </linearGradient>
-          <linearGradient id="landGradEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#14221F" />
-            <stop offset="100%" stopColor="#0E1917" />
-          </linearGradient>
-
-          <linearGradient id="waterGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0B1C3E" />
-            <stop offset="100%" stopColor="#07132B" />
-          </linearGradient>
-          <linearGradient id="waterGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#C8D6E5" />
-            <stop offset="100%" stopColor="#B2C5DA" />
-          </linearGradient>
-          <linearGradient id="landGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#14264A" />
-            <stop offset="100%" stopColor="#101F3C" />
-          </linearGradient>
-          <linearGradient id="landGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#E2E8F0" />
-            <stop offset="100%" stopColor="#CBD5E1" />
-          </linearGradient>
-
-          {/* Glow filter for highlighted tactical elements */}
-          <filter id="tacticalGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-
-          <filter id="emeraldNeonGlow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#10B981" floodOpacity="0.7" />
-          </filter>
-        </defs>
-
-        {/* Base Water Body */}
-        <rect
-          width="1000"
-          height="650"
-          fill={
-            isEmerald
-              ? 'url(#waterGradEmerald)'
-              : isDark
-              ? 'url(#waterGradDark)'
-              : 'url(#waterGradLight)'
-          }
-        />
-
-        {/* Bathymetry depth contours (Strait of Hormuz deep trench) */}
-        <path
-          d="M 520,310 Q 580,300 640,320 T 730,350 T 820,430"
-          fill="none"
-          stroke={isEmerald ? '#152E2B' : isDark ? '#16356B' : '#94A3B8'}
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-        />
-        <path
-          d="M 480,330 Q 560,330 630,350 T 700,400 T 800,480"
-          fill="none"
-          stroke={isEmerald ? '#112422' : isDark ? '#112A57' : '#A4B4CB'}
-          strokeWidth="1"
-          strokeDasharray="2 4"
-        />
-
-        {/* Northern Landmass (Iran Coastline: Bushehr, Bandar Abbas, Qeshm, Hormozgan) */}
-        <path
-          d="M 0,0 L 1000,0 L 1000,260 
-             C 900,250 820,280 750,290 
-             C 680,295 620,290 570,270 
-             C 520,250 480,220 420,200 
-             C 360,180 300,160 220,150 
-             C 140,140 70,150 0,160 Z"
-          fill={
-            isEmerald
-              ? 'url(#landGradEmerald)'
-              : isDark
-              ? 'url(#landGradDark)'
-              : 'url(#landGradLight)'
-          }
-          stroke={isEmerald ? '#203A34' : isDark ? '#2A4478' : '#94A3B8'}
-          strokeWidth="1.5"
-        />
-
-        {/* Southern Landmass (Arabian Peninsula: Kuwait, Saudi Arabia, Qatar, UAE, Oman Musandam) */}
-        <path
-          d="M 0,650 L 1000,650 L 1000,480 
-             C 920,490 850,470 800,420 
-             C 770,390 730,350 710,320 
-             C 695,300 670,310 655,340 
-             C 640,370 610,380 570,390 
-             C 520,400 480,420 440,430 
-             C 410,435 390,390 380,360 
-             C 370,330 350,330 335,370 
-             C 320,410 300,450 240,460 
-             C 180,470 120,460 60,480 
-             C 20,490 0,510 0,520 Z"
-          fill={
-            isEmerald
-              ? 'url(#landGradEmerald)'
-              : isDark
-              ? 'url(#landGradDark)'
-              : 'url(#landGradLight)'
-          }
-          stroke={isEmerald ? '#203A34' : isDark ? '#2A4478' : '#94A3B8'}
-          strokeWidth="1.5"
-        />
-
-        {/* Cartographic Arterial Roads / Highway Network (Gold / Warm Glow like in the image) */}
-        <g opacity={isEmerald ? '0.75' : '0.4'}>
-          {/* Main Coast Highway (North) */}
-          <path
-            d="M 30,155 Q 220,145 420,195 T 570,265 T 750,285 T 980,255"
-            fill="none"
-            stroke={isEmerald ? '#C49E48' : '#D97706'}
-            strokeWidth="2.2"
-          />
-          {/* Secondary links */}
-          <path
-            d="M 120,140 L 150,50 M 340,170 L 370,30 M 640,280 L 680,100"
-            fill="none"
-            stroke={isEmerald ? '#34554E' : '#2A4478'}
-            strokeWidth="1.2"
-          />
-          {/* Southern Peninsula Highways */}
-          <path
-            d="M 50,490 Q 240,450 380,355 T 570,385 T 710,315 T 800,415 T 980,475"
-            fill="none"
-            stroke={isEmerald ? '#C49E48' : '#D97706'}
-            strokeWidth="2.2"
-          />
-          {/* Inland Crosslinks */}
-          <path
-            d="M 240,460 L 260,600 M 440,430 L 480,620 M 610,380 L 650,580"
-            fill="none"
-            stroke={isEmerald ? '#34554E' : '#2A4478'}
-            strokeWidth="1.2"
-          />
-        </g>
-
-        {/* Islands in the Persian Gulf & Strait of Hormuz */}
-        {/* Qeshm Island */}
-        <polygon
-          points="580,280 640,285 660,295 630,305 575,295"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#193466' : '#CBD5E1'}
-          stroke={isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#64748B'}
-          strokeWidth="1"
-        />
-        {/* Hormuz Island */}
-        <circle
-          cx="675"
-          cy="285"
-          r="7"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#64748B'}
-          strokeWidth="1"
-        />
-        {/* Larak Island */}
-        <circle
-          cx="670"
-          cy="305"
-          r="5"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#64748B'}
-          strokeWidth="1"
-        />
-        {/* Greater Tunb & Lesser Tunb */}
-        <circle
-          cx="585"
-          cy="325"
-          r="4"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#F59E0B' : isDark ? '#F6B800' : '#D97706'}
-          strokeWidth="1"
-        />
-        <circle
-          cx="565"
-          cy="330"
-          r="3"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#F59E0B' : isDark ? '#F6B800' : '#D97706'}
-          strokeWidth="1"
-        />
-        {/* Abu Musa */}
-        <circle
-          cx="550"
-          cy="360"
-          r="5"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#F59E0B' : isDark ? '#F6B800' : '#D97706'}
-          strokeWidth="1"
-        />
-        {/* Bahrain */}
-        <polygon
-          points="260,375 270,370 273,390 263,395"
-          fill={isEmerald ? '#1A2F2B' : isDark ? '#1F3F7A' : '#CBD5E1'}
-          stroke={isEmerald ? '#10B981' : isDark ? '#3B6FD6' : '#64748B'}
-          strokeWidth="1"
-        />
-
-        {/* Traffic Separation Scheme (TSS) Shipping Lanes */}
-        <g opacity="0.85">
-          {/* Inbound Lane (Northbound into Gulf) */}
-          <path
-            d="M 830,440 C 760,370 705,330 660,320 C 615,310 540,325 450,345"
-            fill="none"
-            stroke={isEmerald ? '#10B981' : '#F6B800'}
-            strokeWidth="3.5"
-            strokeDasharray="8 6"
-          />
-          {/* Separation Zone Median */}
-          <path
-            d="M 840,455 C 770,385 715,345 670,335 C 625,325 550,340 460,360"
-            fill="none"
-            stroke={isEmerald ? '#2E4A43' : isDark ? '#475569' : '#94A3B8'}
-            strokeWidth="2"
-            strokeDasharray="2 3"
-          />
-          {/* Outbound Lane (Southbound toward Indian Ocean) */}
-          <path
-            d="M 850,470 C 780,400 725,360 680,350 C 635,340 560,355 470,375"
-            fill="none"
-            stroke={isEmerald ? '#38BDF8' : '#3B6FD6'}
-            strokeWidth="3.5"
-            strokeDasharray="8 6"
-          />
-        </g>
-
-        {/* Strategic Boundary Area (Object 1: Sector Alpha Security Perimeter) */}
-        <g
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectObject('obj1');
+        {/* Physical 3D Tactical Sand-Table Board Plate */}
+        <div
+          className={`relative w-[1100px] h-[720px] rounded-2xl overflow-hidden transition-all duration-300 ${
+            is3DMode
+              ? isEmerald
+                ? 'shadow-[0_40px_80px_rgba(0,0,0,0.85),0_0_40px_rgba(16,185,129,0.15)] ring-1 ring-[#203833] border-4 border-[#121E1C]'
+                : isDark
+                ? 'shadow-[0_40px_80px_rgba(0,0,0,0.85),0_0_40px_rgba(59,111,214,0.15)] ring-1 ring-[#1E335E] border-4 border-[#0F2147]'
+                : 'shadow-[0_40px_70px_rgba(0,0,0,0.45)] ring-1 ring-[#94A3B8] border-4 border-[#FFFFFF]'
+              : 'w-full h-full rounded-none border-none shadow-none'
+          }`}
+          style={{
+            // Extruded side depth illusion when 3D tilted
+            boxShadow: is3DMode
+              ? isEmerald
+                ? '0 30px 60px rgba(0,0,0,0.9), 0 10px 0 #0E1716, 0 12px 0 #070D0C, 0 0 35px rgba(16,185,129,0.12)'
+                : '0 30px 60px rgba(0,0,0,0.9), 0 10px 0 #0A1428, 0 12px 0 #050B16'
+              : undefined,
           }}
-          className="cursor-pointer"
         >
-          <polygon
-            points="530,260 680,265 740,330 710,380 610,360 520,320"
-            fill={isEmerald ? '#10B981' : '#3B6FD6'}
-            fillOpacity={selectedObjectId === 'obj1' ? '0.35' : '0.18'}
-            stroke={isEmerald ? '#10B981' : '#3B6FD6'}
-            strokeWidth={selectedObjectId === 'obj1' ? '3.5' : '2'}
-            filter={
-              selectedObjectId === 'obj1'
-                ? isEmerald
-                  ? 'url(#emeraldNeonGlow)'
-                  : 'url(#tacticalGlow)'
-                : undefined
-            }
-          />
-
-          {/* Polygon Vertices / Selection Handles */}
-          {selectedObjectId === 'obj1' && (
-            <g>
-              {[
-                [530, 260],
-                [680, 265],
-                [740, 330],
-                [710, 380],
-                [610, 360],
-                [520, 320],
-              ].map(([vx, vy], idx) => (
-                <circle
-                  key={idx}
-                  cx={vx}
-                  cy={vy}
-                  r="5"
-                  fill="#FFFFFF"
-                  stroke={isEmerald ? '#10B981' : '#3B6FD6'}
-                  strokeWidth="2.5"
-                  className="hover:scale-125 transition-transform"
-                />
-              ))}
-              {/* Centroid Tag */}
-              <text
-                x="620"
-                y="315"
-                fill="#FFFFFF"
-                fontSize="12"
-                fontWeight="700"
-                textAnchor="middle"
-                className="select-none pointer-events-none drop-shadow-md"
-              >
-                SECTOR ALPHA (4,120 km²)
-              </text>
-            </g>
+          {/* BASEMAP LAYER 1: Realistic Satellite Reconnaissance Aerial Imagery (Reference) */}
+          {basemap === 'aerial' && (
+            <div className="absolute inset-0 w-full h-full overflow-hidden bg-[#2D3A29]">
+              {/* High-Resolution Aerial Terrain Map Plate matching user's image */}
+              <img
+                src="/assets/aistudio/map_screen_a2e2a86f.png"
+                alt="Tactical Reconnaissance Aerial Map"
+                className="w-full h-full object-cover select-none pointer-events-none transform scale-[1.12]"
+                style={{
+                  filter: isEmerald
+                    ? 'contrast(1.06) saturate(1.05) brightness(0.98)'
+                    : 'contrast(1.02) saturate(1.02)',
+                }}
+              />
+              {/* Fine tactical vignette over the aerial map */}
+              <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/25 via-transparent to-black/15" />
+            </div>
           )}
-        </g>
 
-        {/* ================= EXACT PINS FROM UPLOADED SAAS UI IMAGE ================= */}
-        {/* 1. William Scaperoth (Magenta Tag #E879F9 + Avatar pin with green ring) */}
-        <g transform="translate(420, 220)" className="cursor-pointer group">
-          <circle cx="0" cy="0" r="16" fill="#10B981" fillOpacity="0.25" className="animate-ping" />
-          <circle cx="0" cy="0" r="13" fill="#132420" stroke="#10B981" strokeWidth="2.5" />
-          <text x="0" y="4" textAnchor="middle" fontSize="10" fill="#FFFFFF" fontWeight="bold">
-            WS
-          </text>
-          {/* Pointer needle */}
-          <path d="M 0,13 L -4,22 L 4,22 Z" fill="#10B981" />
-          {/* Vibrant Magenta Pill Callout */}
-          <g transform="translate(8, 20)">
-            <rect x="0" y="0" width="118" height="20" rx="4" fill="#E879F9" />
-            <text x="6" y="14" fill="#1A1A1A" fontSize="10" fontWeight="800" letterSpacing="0.3">
-              William Scaperoth
-            </text>
-          </g>
-        </g>
+          {/* BASEMAP LAYER 2: Tactical Emerald Vector Corridor */}
+          {basemap === 'emerald' && (
+            <div className="absolute inset-0 w-full h-full bg-[#0A1312]">
+              <svg className="w-full h-full" viewBox="0 0 1000 650">
+                <rect width="1000" height="650" fill="#0B1720" />
+                <path
+                  d="M 0,0 L 1000,0 L 1000,260 C 850,280 650,290 520,240 C 350,180 180,150 0,160 Z"
+                  fill="#14221F"
+                  stroke="#203833"
+                  strokeWidth="2"
+                />
+                <path
+                  d="M 0,650 L 1000,650 L 1000,480 C 800,420 680,310 570,390 C 440,430 240,460 0,520 Z"
+                  fill="#14221F"
+                  stroke="#203833"
+                  strokeWidth="2"
+                />
+                <path
+                  d="M 30,155 Q 350,170 570,265 T 980,255"
+                  fill="none"
+                  stroke="#C49E48"
+                  strokeWidth="3"
+                  opacity="0.8"
+                />
+              </svg>
+            </div>
+          )}
 
-        {/* 2. Cynthia Adams (Vibrant Mint Emerald Tag #10B981 + Avatar pin with green ring) */}
-        <g transform="translate(380, 420)" className="cursor-pointer group">
-          <circle cx="0" cy="0" r="16" fill="#10B981" fillOpacity="0.25" className="animate-ping" />
-          <circle cx="0" cy="0" r="13" fill="#132420" stroke="#10B981" strokeWidth="2.5" />
-          <text x="0" y="4" textAnchor="middle" fontSize="10" fill="#FFFFFF" fontWeight="bold">
-            CA
-          </text>
-          {/* Pointer needle */}
-          <path d="M 0,13 L -4,22 L 4,22 Z" fill="#10B981" />
-          {/* Vibrant Emerald Pill Callout */}
-          <g transform="translate(8, 20)">
-            <rect x="0" y="0" width="92" height="20" rx="4" fill="#10B981" />
-            <text x="6" y="14" fill="#FFFFFF" fontSize="10" fontWeight="800" letterSpacing="0.3">
-              Cynthia Adams
-            </text>
-          </g>
-        </g>
+          {/* BASEMAP LAYER 3: Military Topographic Grid */}
+          {basemap === 'topo' && (
+            <div className="absolute inset-0 w-full h-full bg-[#1A261E]">
+              <svg className="w-full h-full opacity-60" viewBox="0 0 1000 650">
+                {Array.from({ length: 14 }).map((_, i) => (
+                  <ellipse
+                    key={i}
+                    cx="480"
+                    cy="330"
+                    rx={70 + i * 40}
+                    ry={45 + i * 25}
+                    fill="none"
+                    stroke="#84A98C"
+                    strokeWidth="1"
+                    strokeDasharray={i % 4 === 0 ? 'none' : '4 4'}
+                  />
+                ))}
+              </svg>
+            </div>
+          )}
 
-        {/* 3. Ralph Legros (Amber / Warm Yellow Tag #FBBF24 + Avatar pin with green ring) */}
-        <g transform="translate(615, 335)" className="cursor-pointer group">
-          <circle cx="0" cy="0" r="16" fill="#10B981" fillOpacity="0.25" className="animate-ping" />
-          <circle cx="0" cy="0" r="13" fill="#132420" stroke="#10B981" strokeWidth="2.5" />
-          <text x="0" y="4" textAnchor="middle" fontSize="10" fill="#FFFFFF" fontWeight="bold">
-            RL
-          </text>
-          {/* Pointer needle */}
-          <path d="M 0,13 L -4,22 L 4,22 Z" fill="#10B981" />
-          {/* Vibrant Amber Pill Callout */}
-          <g transform="translate(8, 20)">
-            <rect x="0" y="0" width="86" height="20" rx="4" fill="#FBBF24" />
-            <text x="6" y="14" fill="#1A1A1A" fontSize="10" fontWeight="800" letterSpacing="0.3">
-              Ralph Legros
-            </text>
-          </g>
-        </g>
-
-        {/* 4. Tim Willfield (Cobalt Blue Tag #3B82F6 + Avatar pin with green ring) */}
-        <g transform="translate(585, 460)" className="cursor-pointer group">
-          <circle cx="0" cy="0" r="16" fill="#10B981" fillOpacity="0.25" className="animate-ping" />
-          <circle cx="0" cy="0" r="13" fill="#132420" stroke="#10B981" strokeWidth="2.5" />
-          <text x="0" y="4" textAnchor="middle" fontSize="10" fill="#FFFFFF" fontWeight="bold">
-            TW
-          </text>
-          {/* Pointer needle */}
-          <path d="M 0,13 L -4,22 L 4,22 Z" fill="#10B981" />
-          {/* Vibrant Blue Pill Callout */}
-          <g transform="translate(8, 20)">
-            <rect x="0" y="0" width="82" height="20" rx="4" fill="#3B82F6" />
-            <text x="6" y="14" fill="#FFFFFF" fontSize="10" fontWeight="800" letterSpacing="0.3">
-              Tim Willfield
-            </text>
-          </g>
-        </g>
-
-        {/* EW-Radar Marker */}
-        <g
-          transform="translate(645, 290)"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectObject('obj3');
-          }}
-          className="cursor-pointer"
-        >
-          <circle cx="0" cy="0" r="16" fill="#F43F5E" fillOpacity="0.2" className="animate-ping" />
-          <circle cx="0" cy="0" r="10" fill="#F43F5E" stroke="#FFFFFF" strokeWidth="2" />
-          <circle cx="0" cy="0" r="4" fill="#FFFFFF" />
-          <text
-            x="14"
-            y="4"
-            fill={isEmerald ? '#FDA4AF' : isDark ? '#FF9A90' : '#B3170F'}
-            fontSize="11"
-            fontWeight="700"
-            className="select-none drop-shadow"
+          {/* ============================================================== */}
+          {/* INTERACTIVE SVG TACTICAL GRAPHICS OVERLAY                      */}
+          {/* (Curved assault arrows, operational zones, NATO unit symbols)  */}
+          {/* ============================================================== */}
+          <svg
+            className="w-full h-full absolute inset-0 z-10"
+            viewBox="0 0 1000 650"
+            style={{ pointerEvents: 'auto' }}
           >
-            EW-RADAR [01]
-          </text>
-        </g>
+            <defs>
+              {/* Tactical Arrow Markers & Gradients */}
+              <linearGradient id="blueArrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#2563EB" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.95" />
+              </linearGradient>
 
-        {/* Geographical Labels */}
-        <text
-          x="320"
-          y="260"
-          fill={isEmerald ? '#34554E' : isDark ? '#5A75A3' : '#70839E'}
-          fontSize="16"
-          fontWeight="800"
-          letterSpacing="4"
-          className="select-none pointer-events-none"
-        >
-          PERSIAN GULF
-        </text>
-        <text
-          x="660"
-          y="370"
-          fill={isEmerald ? '#34554E' : isDark ? '#5A75A3' : '#70839E'}
-          fontSize="13"
-          fontWeight="800"
-          letterSpacing="2"
-          className="select-none pointer-events-none"
-        >
-          STRAIT OF HORMUZ
-        </text>
-        <text
-          x="870"
-          y="420"
-          fill={isEmerald ? '#34554E' : isDark ? '#5A75A3' : '#70839E'}
-          fontSize="15"
-          fontWeight="800"
-          letterSpacing="3"
-          className="select-none pointer-events-none"
-        >
-          GULF OF OMAN
-        </text>
+              <linearGradient id="greenArrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#059669" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#34D399" stopOpacity="0.95" />
+              </linearGradient>
 
-        {/* GPS Live Follow Location Pin */}
-        {showLocationDot && (
-          <g transform="translate(685, 335)" className="pointer-events-none">
-            <circle
-              cx="0"
-              cy="0"
-              r="24"
-              fill={isEmerald ? '#10B981' : '#3B6FD6'}
-              fillOpacity="0.25"
-              className="animate-ping"
-            />
-            <circle
-              cx="0"
-              cy="0"
-              r="9"
-              fill={isEmerald ? '#10B981' : '#3B6FD6'}
-              stroke="#FFFFFF"
-              strokeWidth="2"
-            />
-            <circle cx="0" cy="0" r="3" fill="#FFFFFF" />
-            <path
-              d="M 0,-12 L -6,-28 L 6,-28 Z"
-              fill={isEmerald ? '#10B981' : '#3B6FD6'}
-              opacity="0.75"
-            />
-          </g>
-        )}
-      </svg>
+              <marker
+                id="arrowheadBlue"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="4"
+                orient="auto"
+              >
+                <path d="M 0 0 L 8 4 L 0 8 Z" fill="#60A5FA" />
+              </marker>
 
-      {/* ================= FLOATING OVERLAY CARDS FROM THE UPLOADED UI IMAGE ================= */}
-      {/* 1. "Members" Floating Card on Lower Left with Neon Green Border Ring */}
-      {isEmerald && showMembersCard && !isAudience && layoutMode !== 'PHONE_PORTRAIT' && (
-        <div className="absolute bottom-6 left-6 z-30 w-72 rounded-2xl bg-[#121E1C]/95 border border-[#10B981]/50 shadow-[0_0_25px_rgba(16,185,129,0.22)] backdrop-blur-md p-3.5 space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-xs font-bold text-white tracking-wide">Members</h4>
-              <p className="text-[10px] text-[#7F9D96]">Mykola Bilanych team • 4 members</p>
+              <marker
+                id="arrowheadGreen"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="4"
+                orient="auto"
+              >
+                <path d="M 0 0 L 8 4 L 0 8 Z" fill="#34D399" />
+              </marker>
+
+              <filter id="tacticalShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="1" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.65" />
+              </filter>
+            </defs>
+
+            {/* 1. Tactical Operational Zones & Defense Perimeters */}
+            {layerZones && (
+              <g className="transition-opacity duration-200">
+                {/* Zone R (Northern Blue Defensive Sector) */}
+                <polygon
+                  points="520,70 600,60 615,115 540,125 515,100"
+                  fill="#2563EB"
+                  fillOpacity="0.22"
+                  stroke="#3B82F6"
+                  strokeWidth="2.5"
+                  filter="url(#tacticalShadow)"
+                />
+                <text
+                  x="565"
+                  y="96"
+                  fill="#93C5FD"
+                  fontSize="12"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  R
+                </text>
+
+                {/* Zone B (Eastern Blue Assembly Area Polygon) */}
+                <polygon
+                  points="650,440 735,460 745,530 685,570 630,550 625,480"
+                  fill="#2563EB"
+                  fillOpacity="0.28"
+                  stroke="#60A5FA"
+                  strokeWidth="2.5"
+                  filter="url(#tacticalShadow)"
+                />
+                <circle cx="685" cy="510" r="14" fill="#1E40AF" stroke="#60A5FA" strokeWidth="1.5" />
+                <text
+                  x="685"
+                  y="515"
+                  fill="#FFFFFF"
+                  fontSize="11"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  B
+                </text>
+
+                {/* Zone E / Objective Area (Green High-Ground Perimeter) */}
+                <polygon
+                  points="575,545 615,530 635,585 625,640 580,650 565,600"
+                  fill="#059669"
+                  fillOpacity="0.25"
+                  stroke="#34D399"
+                  strokeWidth="2.5"
+                  strokeDasharray="6 3"
+                  filter="url(#tacticalShadow)"
+                />
+                <text
+                  x="605"
+                  y="620"
+                  fill="#A7F3D0"
+                  fontSize="12"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  textAnchor="middle"
+                >
+                  E
+                </text>
+                <text
+                  x="545"
+                  y="635"
+                  fill="#34D399"
+                  fontSize="10"
+                  fontFamily="sans-serif"
+                  fontWeight="bold"
+                  className="drop-shadow"
+                >
+                  Objective Area
+                </text>
+
+                {/* Southern Staging Polygon with Target Crosshair */}
+                <polygon
+                  points="425,720 525,700 540,780 440,810 415,760"
+                  fill="#1D4ED8"
+                  fillOpacity="0.28"
+                  stroke="#3B82F6"
+                  strokeWidth="2"
+                  filter="url(#tacticalShadow)"
+                />
+
+                {/* Dashed Phase Lines across Sector */}
+                <path
+                  d="M 440,40 Q 430,200 455,300 T 560,500 T 540,680"
+                  fill="none"
+                  stroke="#10B981"
+                  strokeWidth="2"
+                  strokeDasharray="8 5"
+                  opacity="0.8"
+                />
+                <path
+                  d="M 340,240 Q 410,250 490,320 T 540,420 T 500,600"
+                  fill="none"
+                  stroke="#3B82F6"
+                  strokeWidth="2"
+                  strokeDasharray="6 4"
+                  opacity="0.8"
+                />
+                <path
+                  d="M 500,60 Q 560,190 625,290 T 780,360"
+                  fill="none"
+                  stroke="#EF4444"
+                  strokeWidth="2"
+                  strokeDasharray="7 5"
+                  opacity="0.75"
+                />
+              </g>
+            )}
+
+            {/* 2. Curved Tactical Assault & Advance Maneuver Arrows */}
+            {layerArrows && (
+              <g className="transition-opacity duration-200">
+                {/* Green Maneuver Arrow 1 (Sweep across central valley) */}
+                <path
+                  d="M 350,420 Q 400,380 425,340"
+                  fill="none"
+                  stroke="url(#greenArrowGrad)"
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowheadGreen)"
+                  filter="url(#tacticalShadow)"
+                />
+
+                {/* Green Maneuver Arrow 2 (Main effort toward objective) */}
+                <path
+                  d="M 400,470 Q 455,460 480,410"
+                  fill="none"
+                  stroke="url(#greenArrowGrad)"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowheadGreen)"
+                  filter="url(#tacticalShadow)"
+                />
+
+                {/* Blue Assault Arrow 1 (Sweeping curve to river crossing) */}
+                <path
+                  d="M 505,320 Q 550,290 595,290"
+                  fill="none"
+                  stroke="url(#blueArrowGrad)"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowheadBlue)"
+                  filter="url(#tacticalShadow)"
+                />
+
+                {/* Blue Assault Arrow 2 (Supporting thrust along ridge) */}
+                <path
+                  d="M 545,390 Q 565,330 590,310"
+                  fill="none"
+                  stroke="url(#blueArrowGrad)"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowheadBlue)"
+                  filter="url(#tacticalShadow)"
+                />
+
+                {/* Blue Vertical Advance Arrow (Southern staging to town) */}
+                <path
+                  d="M 515,640 Q 515,550 515,480"
+                  fill="none"
+                  stroke="url(#blueArrowGrad)"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowheadBlue)"
+                  filter="url(#tacticalShadow)"
+                />
+              </g>
+            )}
+
+            {/* 3. Tactical Units (MIL-STD-2525 Symbology) */}
+            {layerUnits && (
+              <g className="transition-opacity duration-200">
+                {/* RED ENEMY FORCES (Bridgehead & Defense Center) */}
+                <g transform="translate(600, 280)" className="cursor-pointer">
+                  <rect
+                    x="-18"
+                    y="-12"
+                    width="36"
+                    height="24"
+                    rx="4"
+                    fill="#DC2626"
+                    stroke="#FFFFFF"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  <line x1="-12" y1="-8" x2="12" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <line x1="12" y1="-8" x2="-12" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <text x="0" y="24" fill="#FCA5A5" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    OPFOR 1
+                  </text>
+                </g>
+
+                <g transform="translate(670, 275)" className="cursor-pointer">
+                  <rect
+                    x="-18"
+                    y="-12"
+                    width="36"
+                    height="24"
+                    rx="4"
+                    fill="#DC2626"
+                    stroke="#FFFFFF"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  <ellipse cx="0" cy="0" rx="9" ry="5" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <text x="0" y="24" fill="#FCA5A5" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    OPFOR T-80
+                  </text>
+                </g>
+
+                {/* Red Target Reticle on Ridge */}
+                <g transform="translate(750, 170)">
+                  <circle cx="0" cy="0" r="16" fill="#DC2626" fillOpacity="0.2" className="animate-ping" />
+                  <circle cx="0" cy="0" r="10" fill="none" stroke="#EF4444" strokeWidth="2" />
+                  <circle cx="0" cy="0" r="5" fill="#EF4444" />
+                  <line x1="-14" y1="0" x2="14" y2="0" stroke="#EF4444" strokeWidth="1.5" />
+                  <line x1="0" y1="-14" x2="0" y2="14" stroke="#EF4444" strokeWidth="1.5" />
+                </g>
+
+                {/* GREEN ALLIED FORCES */}
+                <g transform="translate(425, 335)" className="cursor-pointer">
+                  <rect
+                    x="-18"
+                    y="-12"
+                    width="36"
+                    height="24"
+                    rx="4"
+                    fill="#059669"
+                    stroke="#FFFFFF"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  <ellipse cx="0" cy="0" rx="10" ry="5" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <text x="0" y="22" fill="#6EE7B7" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    TF-EAGLE
+                  </text>
+                </g>
+
+                <g transform="translate(490, 360)" className="cursor-pointer">
+                  <rect
+                    x="-16"
+                    y="-12"
+                    width="32"
+                    height="24"
+                    rx="4"
+                    fill="#059669"
+                    stroke="#FFFFFF"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  <line x1="-10" y1="-8" x2="10" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <line x1="10" y1="-8" x2="-10" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                </g>
+
+                {/* BLUE FRIENDLY FORCES */}
+                <g transform="translate(285, 275)" className="cursor-pointer">
+                  <rect
+                    x="-18"
+                    y="-12"
+                    width="36"
+                    height="24"
+                    rx="4"
+                    fill="#2563EB"
+                    stroke="#FFFFFF"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  <line x1="-12" y1="-8" x2="12" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <line x1="12" y1="-8" x2="-12" y2="8" stroke="#FFFFFF" strokeWidth="1.5" />
+                  <text x="0" y="22" fill="#93C5FD" fontSize="9" fontWeight="bold" textAnchor="middle">
+                    1-41 INF
+                  </text>
+                </g>
+
+                {/* 3 Infantry Squad Silhouettes in formation */}
+                <g transform="translate(280, 410)" className="cursor-pointer">
+                  <rect
+                    x="-32"
+                    y="-14"
+                    width="64"
+                    height="28"
+                    rx="6"
+                    fill="#1D4ED8"
+                    stroke="#60A5FA"
+                    strokeWidth="1.8"
+                    filter="url(#tacticalShadow)"
+                  />
+                  {[-18, 0, 18].map((offset, idx) => (
+                    <g key={idx} transform={`translate(${offset}, 0)`}>
+                      <circle cx="0" cy="-5" r="3" fill="#FFFFFF" />
+                      <line x1="0" y1="-2" x2="0" y2="6" stroke="#FFFFFF" strokeWidth="2" />
+                      <line x1="-4" y1="1" x2="4" y2="1" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <line x1="0" y1="6" x2="-3" y2="11" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <line x1="0" y1="6" x2="3" y2="11" stroke="#FFFFFF" strokeWidth="1.5" />
+                    </g>
+                  ))}
+                </g>
+
+                {/* Placed Interactive Symbols */}
+                {placedSymbols.map((item) => (
+                  <g
+                    key={item.id}
+                    transform={`translate(${item.x}, ${item.y})`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      alert(`Selected Tactical Asset: ${item.label}`);
+                    }}
+                    className="cursor-pointer group"
+                  >
+                    <circle cx="0" cy="0" r="14" fill={item.color} fillOpacity="0.25" className="animate-ping" />
+                    <rect
+                      x="-16"
+                      y="-12"
+                      width="32"
+                      height="24"
+                      rx="5"
+                      fill={item.color}
+                      stroke="#FFFFFF"
+                      strokeWidth="2"
+                      filter="url(#tacticalShadow)"
+                    />
+                    <text
+                      x="0"
+                      y="4"
+                      fill="#FFFFFF"
+                      fontSize="9"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      fontFamily="monospace"
+                    >
+                      {item.label.slice(0, 3)}
+                    </text>
+                    <text
+                      x="0"
+                      y="24"
+                      fill="#FFFFFF"
+                      fontSize="9"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      className="drop-shadow"
+                    >
+                      {item.label}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            )}
+
+            {/* Live GPS location pulse */}
+            {showLocationDot && (
+              <g transform="translate(515, 490)" className="pointer-events-none">
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="24"
+                  fill={isEmerald ? '#10B981' : '#3B6FD6'}
+                  fillOpacity="0.25"
+                  className="animate-ping"
+                />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="9"
+                  fill={isEmerald ? '#10B981' : '#3B6FD6'}
+                  stroke="#FFFFFF"
+                  strokeWidth="2"
+                />
+                <circle cx="0" cy="0" r="3" fill="#FFFFFF" />
+              </g>
+            )}
+          </svg>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* FLOATING "SYMBOL PALETTE" PANEL (Bottom-Right, from reference)  */}
+      {/* ============================================================== */}
+      {showSymbolPalette && !isAudience && (
+        <div
+          className={`absolute bottom-6 right-6 z-30 w-80 rounded-2xl border shadow-2xl backdrop-blur-md p-3.5 space-y-3 transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+            isEmerald
+              ? 'bg-[#121E1C]/95 border-[#203833] text-white shadow-[0_15px_35px_rgba(0,0,0,0.6)] ring-1 ring-[#10B981]/30'
+              : isDark
+              ? 'bg-[#0F2147]/95 border-[#2A4478] text-white shadow-[0_15px_35px_rgba(0,0,0,0.6)]'
+              : 'bg-white/95 border-[#C3CCDA] text-[#0A1A3A] shadow-xl'
+          }`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b pb-2 border-current/10">
+            <div className="flex items-center gap-2">
+              <Crosshair className={`w-4 h-4 ${isEmerald ? 'text-[#10B981]' : 'text-[#3B6FD6]'}`} />
+              <h4 className="text-xs font-bold tracking-wide">Symbol Palette</h4>
             </div>
             <button
-              onClick={() => setShowMembersCard(false)}
-              className="p-1 rounded-md text-[#7F9D96] hover:text-white hover:bg-white/10"
+              onClick={() => setShowSymbolPalette(false)}
+              className="p-1 rounded-md text-current/60 hover:text-current hover:bg-current/10 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="space-y-1.5">
-            {[
-              { name: 'Tim Burton (You)', email: 'tim_b12@gmail.com', role: 'Owner', isOwner: true },
-              { name: 'Sofa Adams', email: 'sofa@gmail.com', role: 'Can view' },
-              { name: 'Ryan Walberg', email: 'ryan@gmail.com', role: 'Can view' },
-              { name: 'Adam Rossen', email: 'adam@gmail.com', role: 'Can edit' },
-            ].map((member, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-1.5 rounded-xl hover:bg-[#1A2C29] transition-colors"
+          {/* Categorized Rows matching the reference image */}
+          <div className="space-y-2.5 text-xs">
+            {/* 1. Land Category */}
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[10px] font-semibold text-current/60 shrink-0">Land</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'inf_1', name: 'Infantry', icon: '⧄' },
+                  { id: 'inf_2', name: 'Mech Inf', icon: '⧅' },
+                  { id: 'arm_1', name: 'Armor', icon: '⬬' },
+                  { id: 'apc_1', name: 'APC', icon: '◫' },
+                  { id: 'hq_1', name: 'Command', icon: '⚑' },
+                  { id: 'sol_1', name: 'Trooper', icon: '♟' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedPaletteSymbol(s.name);
+                    }}
+                    title={`Click to place ${s.name} on map`}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${
+                      selectedPaletteSymbol === s.name
+                        ? 'bg-[#10B981] text-white border-[#10B981] ring-2 ring-[#10B981]/50 scale-110'
+                        : isEmerald
+                        ? 'bg-[#172825] border-[#203833] text-[#34D399] hover:bg-[#10B981]/20 hover:border-[#10B981]'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:scale-105'
+                    }`}
+                  >
+                    {s.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Air Category */}
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[10px] font-semibold text-current/60 shrink-0">Air</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'air_1', name: 'CAS Jet', icon: '✈' },
+                  { id: 'air_2', name: 'Chopper', icon: '🚁' },
+                  { id: 'air_3', name: 'UAV Recon', icon: '🛩' },
+                  { id: 'air_4', name: 'Transport', icon: '◬' },
+                  { id: 'air_5', name: 'Hovercraft', icon: '⬭' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedPaletteSymbol(s.name);
+                    }}
+                    title={`Click to place ${s.name} on map`}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${
+                      selectedPaletteSymbol === s.name
+                        ? 'bg-[#10B981] text-white border-[#10B981] ring-2 ring-[#10B981]/50 scale-110'
+                        : isEmerald
+                        ? 'bg-[#172825] border-[#203833] text-[#34D399] hover:bg-[#10B981]/20 hover:border-[#10B981]'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 hover:scale-105'
+                    }`}
+                  >
+                    {s.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Sea Category */}
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[10px] font-semibold text-current/60 shrink-0">Sea</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'sea_1', name: 'Destroyer', icon: '⚓' },
+                  { id: 'sea_2', name: 'Submarine', icon: '⌓' },
+                  { id: 'sea_3', name: 'Patrol Boat', icon: '⛵' },
+                  { id: 'sea_4', name: 'Star Point', icon: '★' },
+                  { id: 'sea_5', name: 'Task Force', icon: '⎈' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedPaletteSymbol(s.name);
+                    }}
+                    title={`Click to place ${s.name} on map`}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${
+                      selectedPaletteSymbol === s.name
+                        ? 'bg-[#3B82F6] text-white border-[#3B82F6] ring-2 ring-[#3B82F6]/50 scale-110'
+                        : isEmerald
+                        ? 'bg-[#172825] border-[#203833] text-[#60A5FA] hover:bg-[#3B82F6]/20 hover:border-[#3B82F6]'
+                        : 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:scale-105'
+                    }`}
+                  >
+                    {s.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 4. Special Gps Category */}
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-[10px] font-semibold text-current/60 shrink-0">Special</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'sp_1', name: 'Special Ops', icon: '✠' },
+                  { id: 'sp_2', name: 'Crosshair', icon: '⊕' },
+                  { id: 'sp_3', name: 'Artillery', icon: '🎯' },
+                  { id: 'sp_4', name: 'Chevron', icon: '▲' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedPaletteSymbol(s.name);
+                    }}
+                    title={`Click to place ${s.name} on map`}
+                    className={`w-7 h-7 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${
+                      selectedPaletteSymbol === s.name
+                        ? 'bg-[#F59E0B] text-white border-[#F59E0B] ring-2 ring-[#F59E0B]/50 scale-110'
+                        : isEmerald
+                        ? 'bg-[#172825] border-[#203833] text-[#FBBF24] hover:bg-[#F59E0B]/20 hover:border-[#F59E0B]'
+                        : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:scale-105'
+                    }`}
+                  >
+                    {s.icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {selectedPaletteSymbol && (
+            <div className="p-2 rounded-xl bg-[#10B981]/15 border border-[#10B981]/40 flex items-center justify-between text-[11px] text-[#34D399]">
+              <span>Placing: {selectedPaletteSymbol} — Click on map</span>
+              <button
+                onClick={() => setSelectedPaletteSymbol(null)}
+                className="text-xs font-bold text-white/80 hover:text-white"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-[#1A2C29] border border-[#2B4741] flex items-center justify-center text-[10px] font-bold text-[#10B981]">
-                    {member.name.charAt(0)}
-                  </div>
-                  <div className="truncate">
-                    <div className="text-[11px] font-semibold text-white leading-tight truncate">
-                      {member.name}
-                    </div>
-                    <div className="text-[9px] text-[#6E8F87] font-mono leading-tight truncate">
-                      {member.email}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-[#9DBAB4] font-medium">{member.role}</span>
-                  {!member.isOwner && <ChevronDown className="w-3 h-3 text-[#6E8F87]" />}
-                </div>
-              </div>
-            ))}
-          </div>
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. "Los Angeles, California" / "Tactical Inset" Floating Card on Lower Right */}
-      {isEmerald && showInsetCard && !isAudience && layoutMode !== 'PHONE_PORTRAIT' && (
-        <div className="absolute bottom-6 right-16 z-30 w-64 rounded-2xl bg-[#121E1C]/95 border border-[#10B981]/50 shadow-[0_0_25px_rgba(16,185,129,0.25)] backdrop-blur-md p-3 space-y-2.5 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div className="w-4 h-4 rounded bg-[#3B82F6] flex items-center justify-center text-[9px] text-white">
-                📁
-              </div>
-              <span className="text-xs font-bold text-white truncate">
-                Los Angeles, California
-              </span>
-            </div>
-            <div className="w-5 h-5 rounded-md bg-[#10B981]/20 border border-[#10B981] flex items-center justify-center text-[#FBBF24]">
-              <Star className="w-3 h-3 fill-current" />
-            </div>
-          </div>
-
-          {/* Mini Inset Map Graphic */}
-          <div className="w-full h-24 rounded-xl bg-[#091211] border border-[#1C332F] overflow-hidden relative flex items-center justify-center">
-            <div
-              className="absolute inset-0 opacity-40"
-              style={{
-                backgroundImage: 'radial-gradient(circle, #C49E48 1px, transparent 1px)',
-                backgroundSize: '16px 16px',
-              }}
-            />
-            {/* Roads in mini map */}
-            <svg className="w-full h-full absolute inset-0" viewBox="0 0 200 96">
-              <path d="M 10,80 Q 90,40 180,20" stroke="#C49E48" strokeWidth="1.5" fill="none" />
-              <path d="M 40,20 Q 110,60 170,85" stroke="#34554E" strokeWidth="1" fill="none" />
-              <circle cx="100" cy="48" r="4" fill="#10B981" />
-              <text x="100" y="60" textAnchor="middle" fill="#9DBAB4" fontSize="8" fontWeight="bold">
-                Seattle Array
-              </text>
-            </svg>
-          </div>
-
-          <div className="flex items-center justify-between text-[10px] text-[#6E8F87] font-mono pt-1 border-t border-[#1C332F]">
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>Edited 12 days ago</span>
-            </div>
-            <MoreHorizontal className="w-3.5 h-3.5 hover:text-white cursor-pointer" />
-          </div>
-        </div>
-      )}
-
-      {/* Map Overlay HUD (Scale bar, north indicator, attribution, zoom tools) */}
+      {/* ============================================================== */}
+      {/* FLOATING HUD CONTROLS: 3D Perspective, Basemap, Layers, Zoom   */}
+      {/* ============================================================== */}
       {!isAudience && (
         <>
-          {/* North Arrow / Compass (Top-right) */}
-          <div className="absolute top-4 right-4 flex flex-col items-center gap-2 z-10">
-            <button
-              onClick={resetBearing}
-              title="Reset Bearing (North-Up)"
-              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border transition-all ${
+          {/* Top-Right Map Box Toolbar */}
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2 flex-wrap max-w-lg justify-end">
+            {/* 3D Sand-Table Mode Toggle */}
+            <div
+              className={`flex items-center rounded-xl p-1 border shadow-lg backdrop-blur-md ${
                 isEmerald
-                  ? 'bg-[#152421] hover:bg-[#1E332F] text-white border-[#243E38] shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                  ? 'bg-[#121E1C]/90 border-[#203833]'
                   : isDark
-                  ? 'bg-[#16305F] hover:bg-[#1C3B75] text-[#FFFFFF] border-[#2A4478]'
-                  : 'bg-[#FFFFFF] hover:bg-[#F1F5F9] text-[#0A1A3A] border-[#C3CCDA]'
+                  ? 'bg-[#0F2147]/90 border-[#2A4478]'
+                  : 'bg-white/90 border-[#C3CCDA]'
+              }`}
+            >
+              <button
+                onClick={() => {
+                  setIs3DMode(!is3DMode);
+                  if (!is3DMode && pitch === 0) setPitch(30);
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  is3DMode
+                    ? isEmerald
+                      ? 'bg-[#10B981] text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                      : 'bg-[#3B6FD6] text-white'
+                    : 'text-current/60 hover:text-current'
+                }`}
+                title="Toggle 2.5D Sand-Table Perspective"
+              >
+                <Box className="w-3.5 h-3.5" />
+                <span>3D Sand Table</span>
+              </button>
+
+              {is3DMode && (
+                <div className="flex items-center gap-1 pl-1 ml-1 border-l border-current/15 text-[10px] font-mono">
+                  {[20, 30, 42].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPitch(p)}
+                      className={`px-1.5 py-0.5 rounded ${
+                        pitch === p ? 'bg-current/20 font-bold' : 'opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      {p}°
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Basemap Switcher Pill */}
+            <div
+              className={`flex items-center rounded-xl p-1 border shadow-lg backdrop-blur-md text-xs font-bold ${
+                isEmerald
+                  ? 'bg-[#121E1C]/90 border-[#203833]'
+                  : isDark
+                  ? 'bg-[#0F2147]/90 border-[#2A4478]'
+                  : 'bg-white/90 border-[#C3CCDA]'
+              }`}
+            >
+              <button
+                onClick={() => setBasemap('aerial')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  basemap === 'aerial'
+                    ? isEmerald
+                      ? 'bg-[#10B981] text-white shadow'
+                      : 'bg-[#3B6FD6] text-white shadow'
+                    : 'text-current/60 hover:text-current'
+                }`}
+              >
+                Aerial
+              </button>
+              <button
+                onClick={() => setBasemap('emerald')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  basemap === 'emerald'
+                    ? isEmerald
+                      ? 'bg-[#10B981] text-white shadow'
+                      : 'bg-[#3B6FD6] text-white shadow'
+                    : 'text-current/60 hover:text-current'
+                }`}
+              >
+                Emerald
+              </button>
+              <button
+                onClick={() => setBasemap('topo')}
+                className={`px-2 py-1 rounded-lg transition-all ${
+                  basemap === 'topo'
+                    ? isEmerald
+                      ? 'bg-[#10B981] text-white shadow'
+                      : 'bg-[#3B6FD6] text-white shadow'
+                    : 'text-current/60 hover:text-current'
+                }`}
+              >
+                Topo
+              </button>
+            </div>
+
+            {/* Quick Palette Toggle Button */}
+            <button
+              onClick={() => setShowSymbolPalette(!showSymbolPalette)}
+              title="Toggle Symbol Palette"
+              className={`p-2 rounded-xl border shadow-lg backdrop-blur-md transition-all ${
+                showSymbolPalette
+                  ? isEmerald
+                    ? 'bg-[#10B981] text-white border-[#10B981] shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                    : 'bg-[#3B6FD6] text-white border-[#3B6FD6]'
+                  : isEmerald
+                  ? 'bg-[#121E1C]/90 text-white border-[#203833] hover:bg-[#172825]'
+                  : isDark
+                  ? 'bg-[#0F2147]/90 text-white border-[#2A4478]'
+                  : 'bg-white/90 text-[#0A1A3A] border-[#C3CCDA]'
+              }`}
+            >
+              <Crosshair className="w-4 h-4" />
+            </button>
+
+            {/* North Reset Compass */}
+            <button
+              onClick={resetView}
+              title="Reset View (North-Up & Flat)"
+              className={`w-9 h-9 rounded-xl flex items-center justify-center border shadow-lg backdrop-blur-md transition-all ${
+                isEmerald
+                  ? 'bg-[#121E1C]/90 text-white border-[#203833] hover:bg-[#172825]'
+                  : isDark
+                  ? 'bg-[#0F2147]/90 text-white border-[#2A4478] hover:bg-[#16305F]'
+                  : 'bg-white/90 text-[#0A1A3A] border-[#C3CCDA]'
               }`}
             >
               <Compass
-                className="w-5 h-5 transition-transform"
+                className="w-4 h-4 transition-transform"
                 style={{
                   transform: `rotate(${-bearing}deg)`,
-                  color:
-                    bearing === 0
-                      ? isEmerald
-                        ? '#10B981'
-                        : isDark
-                        ? '#9DBBF8'
-                        : '#2A55B0'
-                      : '#F43F5E',
+                  color: bearing === 0 ? (isEmerald ? '#10B981' : '#3B6FD6') : '#EF4444',
                 }}
               />
             </button>
 
-            {/* Quick Zoom Buttons */}
+            {/* Zoom Stepper */}
             <div
-              className={`flex flex-col rounded-lg shadow-lg border overflow-hidden ${
+              className={`flex flex-col rounded-xl border shadow-lg backdrop-blur-md overflow-hidden ${
                 isEmerald
-                  ? 'bg-[#152421] border-[#243E38]'
+                  ? 'bg-[#121E1C]/90 border-[#203833]'
                   : isDark
-                  ? 'bg-[#16305F] border-[#2A4478]'
-                  : 'bg-[#FFFFFF] border-[#C3CCDA]'
+                  ? 'bg-[#0F2147]/90 border-[#2A4478]'
+                  : 'bg-white/90 border-[#C3CCDA]'
               }`}
             >
               <button
                 onClick={() => handleZoom(0.2)}
-                className={`w-10 h-10 flex items-center justify-center transition-colors ${
-                  isEmerald
-                    ? 'hover:bg-[#1E332F] text-white'
-                    : isDark
-                    ? 'hover:bg-[#20407A] text-[#FFFFFF]'
-                    : 'hover:bg-[#E2E8F0] text-[#0A1A3A]'
-                }`}
+                className="w-9 h-8 flex items-center justify-center hover:bg-current/10 transition-colors"
                 title="Zoom In"
               >
-                <ZoomIn className="w-4 h-4" />
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
-              <div
-                className={`h-[1px] ${
-                  isEmerald ? 'bg-[#243E38]' : isDark ? 'bg-[#2A4478]' : 'bg-[#CBD5E1]'
-                }`}
-              />
+              <div className="h-[1px] bg-current/15" />
               <button
                 onClick={() => handleZoom(-0.2)}
-                className={`w-10 h-10 flex items-center justify-center transition-colors ${
-                  isEmerald
-                    ? 'hover:bg-[#1E332F] text-white'
-                    : isDark
-                    ? 'hover:bg-[#20407A] text-[#FFFFFF]'
-                    : 'hover:bg-[#E2E8F0] text-[#0A1A3A]'
-                }`}
+                className="w-9 h-8 flex items-center justify-center hover:bg-current/10 transition-colors"
                 title="Zoom Out"
               >
-                <ZoomOut className="w-4 h-4" />
+                <ZoomOut className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Scale Bar (Design Guide §14: 116×22dp scale bar) & Coordinate Badge */}
-          <div className="absolute bottom-3 left-4 flex flex-col gap-1 z-10 pointer-events-none">
-            {/* Scale Bar */}
-            <div
-              className={`px-2 py-1 rounded backdrop-blur-sm border flex items-center gap-2 text-[10px] font-mono font-medium ${
-                isEmerald
-                  ? 'bg-[#0B1514]/85 text-[#9DBAB4] border-[#243E38]'
-                  : isDark
-                  ? 'bg-[#0A1A3A]/80 text-[#B8C4DC] border-[#2A4478]'
-                  : 'bg-[#FFFFFF]/90 text-[#46546F] border-[#C3CCDA]'
+          {/* Top-Left Tactical Layer Visibility Filter */}
+          <div
+            className={`absolute top-4 left-4 z-30 flex items-center gap-1.5 p-1 rounded-xl border shadow-lg backdrop-blur-md text-[11px] font-semibold ${
+              isEmerald
+                ? 'bg-[#121E1C]/90 border-[#203833] text-white'
+                : isDark
+                ? 'bg-[#0F2147]/90 border-[#2A4478] text-white'
+                : 'bg-white/90 border-[#C3CCDA] text-[#0A1A3A]'
+            }`}
+          >
+            <button
+              onClick={() => setLayerArrows(!layerArrows)}
+              className={`px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                layerArrows ? 'bg-[#10B981]/20 text-[#34D399] font-bold' : 'opacity-40'
               }`}
             >
-              <div className="w-[116px] h-[4px] bg-current rounded-full relative flex justify-between">
-                <span className="w-[2px] h-[8px] bg-current -top-[2px] absolute left-0" />
-                <span className="w-[2px] h-[6px] bg-current -top-[1px] absolute left-1/2" />
-                <span className="w-[2px] h-[8px] bg-current -top-[2px] absolute right-0" />
+              <span>Arrows</span>
+            </button>
+            <button
+              onClick={() => setLayerUnits(!layerUnits)}
+              className={`px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                layerUnits ? 'bg-[#3B82F6]/20 text-[#60A5FA] font-bold' : 'opacity-40'
+              }`}
+            >
+              <span>Units</span>
+            </button>
+            <button
+              onClick={() => setLayerZones(!layerZones)}
+              className={`px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                layerZones ? 'bg-[#F59E0B]/20 text-[#FBBF24] font-bold' : 'opacity-40'
+              }`}
+            >
+              <span>Zones</span>
+            </button>
+          </div>
+
+          {/* Bottom-Left Tactical Scale & Metrics */}
+          <div className="absolute bottom-4 left-4 z-20 flex flex-col gap-1.5 pointer-events-none">
+            <div
+              className={`px-3 py-1.5 rounded-xl border backdrop-blur-md flex items-center gap-2.5 text-[11px] font-mono ${
+                isEmerald
+                  ? 'bg-[#121E1C]/85 border-[#203833] text-[#9DBAB4]'
+                  : isDark
+                  ? 'bg-[#0F2147]/85 border-[#2A4478] text-[#B8C4DC]'
+                  : 'bg-white/90 border-[#C3CCDA] text-[#46546F]'
+              }`}
+            >
+              <div className="w-[100px] h-[3px] bg-current rounded-full relative flex justify-between">
+                <span className="w-[2px] h-[6px] bg-current -top-[1.5px] absolute left-0" />
+                <span className="w-[2px] h-[4px] bg-current -top-[0.5px] absolute left-1/2" />
+                <span className="w-[2px] h-[6px] bg-current -top-[1.5px] absolute right-0" />
               </div>
-              <span>50 km / 27 NM</span>
+              <span className="font-bold">5 km / 2.7 NM</span>
+              <span className="opacity-40">•</span>
+              <span className="text-[10px] opacity-80">
+                {is3DMode ? `3D Sand Table (${pitch}°)` : '2D Top-Down'}
+              </span>
             </div>
 
-            {/* Attribution Badge */}
             <div
-              className={`text-[9px] px-2 py-0.5 rounded font-mono ${
+              className={`text-[9px] px-2.5 py-0.5 rounded font-mono ${
                 isEmerald ? 'text-[#60857E]' : isDark ? 'text-[#7F93B8]' : 'text-[#64748B]'
               }`}
             >
-              MapX Tactical Engine • WGS 84 / UTM 40R • Offline Tiles
+              Recon Sector Alfa-4 • MIL-STD-2525D Tactical Graphics
             </div>
           </div>
         </>
       )}
 
-      {/* Drawing Mode Prompt Overlay */}
+      {/* Active Drawing Mode Notification Banner */}
       {drawingTool && (
         <div
-          className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-xl border flex items-center gap-2 text-xs font-semibold z-20 animate-pulse ${
+          className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-2xl border flex items-center gap-2 text-xs font-semibold z-40 animate-pulse ${
             isEmerald
-              ? 'bg-[#10B981] text-white border-[#34D399] shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-              : isDark
-              ? 'bg-[#3B6FD6] text-[#FFFFFF] border-[#9DBBF8]'
-              : 'bg-[#2A55B0] text-[#FFFFFF] border-[#B8C4DC]'
+              ? 'bg-[#10B981] text-white border-[#34D399] shadow-[0_0_20px_rgba(16,185,129,0.5)]'
+              : 'bg-[#3B6FD6] text-white border-[#9DBBF8]'
           }`}
         >
           <div className="w-2 h-2 rounded-full bg-white animate-ping" />
-          <span>Active Drawing: {drawingTool.replace('_', ' ')} — Tap to plot points</span>
+          <span>Active Drawing: {drawingTool.replace('_', ' ')} — Tap map to plot</span>
         </div>
       )}
     </div>

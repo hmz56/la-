@@ -49,6 +49,8 @@ export type CoordinateFormat = 'DD' | 'DDM' | 'DMS' | 'UTM' | 'MGRS';
 
 export type ThemeMode = 'dark' | 'emerald' | 'light';
 
+export type BasemapMode = 'aerial' | 'emerald' | 'topo';
+
 export type LanguageMode = 'en' | 'ar';
 
 export type LocateState = 'idle' | 'searching' | 'located' | 'follow' | 'denied' | 'no_gnss';
