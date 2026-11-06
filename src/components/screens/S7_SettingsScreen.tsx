@@ -12,7 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { CoordinateFormat, LanguageMode, ThemeMode } from '../../types';
-import { I18N } from '../../constants/theme';
+import { I18N, THEMES_LIST } from '../../constants/theme';
 
 interface S7SettingsScreenProps {
   theme: ThemeMode;
@@ -175,61 +175,57 @@ export const S7_SettingsScreen: React.FC<S7SettingsScreenProps> = ({
           {/* TAB 3: Theme */}
           {activeTab === 'theme' && (
             <div className="space-y-4">
-              <h2 className="text-sm font-bold text-[#7F93B8] uppercase">Appearance & Color System</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  onClick={() => onSetTheme('emerald')}
-                  className={`p-4 rounded-2xl border text-left space-y-2 transition-all ${
-                    theme === 'emerald'
-                      ? 'border-[#10B981] ring-2 ring-[#10B981]/50 bg-[#12201D] shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                      : 'border-[#203833] bg-[#172825]/60 hover:bg-[#1E332F]'
-                  }`}
-                >
-                  <div className="w-full h-12 rounded-lg bg-[#0A1312] border border-[#203833] flex items-center px-2 gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981]" />
-                    <div className="w-8 h-2 rounded bg-[#172825]" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Tactical Emerald (#0A1312)</div>
-                    <div className="text-[10px] text-[#7F9D96]">Matte charcoal & neon mint glow</div>
-                  </div>
-                </button>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-[#7F93B8] uppercase">
+                  Appearance & Tactical Color Themes ({THEMES_LIST.length})
+                </h2>
+                <span className="text-xs text-[#3B6FD6] font-mono font-bold">
+                  Active: {THEMES_LIST.find((t) => t.id === theme)?.name}
+                </span>
+              </div>
 
-                <button
-                  onClick={() => onSetTheme('dark')}
-                  className={`p-4 rounded-2xl border text-left space-y-2 transition-all ${
-                    theme === 'dark'
-                      ? 'border-[#3B6FD6] ring-2 ring-[#3B6FD6]/50 bg-[#0F2147]'
-                      : 'border-[#2A4478] bg-[#16305F]/40'
-                  }`}
-                >
-                  <div className="w-full h-12 rounded-lg bg-[#0A1A3A] border border-[#2A4478] flex items-center px-2 gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#3B6FD6]" />
-                    <div className="w-8 h-2 rounded bg-[#16305F]" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold">Dark Navy (#0A1A3A)</div>
-                    <div className="text-[10px] text-[#7F93B8]">Classic operations center theme</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => onSetTheme('light')}
-                  className={`p-4 rounded-2xl border text-left space-y-2 transition-all ${
-                    theme === 'light'
-                      ? 'border-[#3B6FD6] ring-2 ring-[#3B6FD6]/50 bg-white'
-                      : 'border-[#C3CCDA] bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="w-full h-12 rounded-lg bg-[#EEF1F6] border border-[#C3CCDA] flex items-center px-2 gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-[#2A55B0]" />
-                    <div className="w-8 h-2 rounded bg-white" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#0A1A3A]">Cool Light Grey (#EEF1F6)</div>
-                    <div className="text-[10px] text-[#64748B]">Daylight and outdoor field viewing</div>
-                  </div>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {THEMES_LIST.map((th) => {
+                  const isActive = theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      onClick={() => onSetTheme(th.id)}
+                      className={`p-4 rounded-2xl border text-left space-y-2.5 transition-all ${
+                        isActive
+                          ? 'border-[#3B6FD6] ring-2 ring-[#3B6FD6]/50 bg-[#16305F] shadow-lg'
+                          : 'border-current/15 bg-black/10 hover:bg-black/20'
+                      }`}
+                    >
+                      <div
+                        className="w-full h-12 rounded-xl border border-white/15 flex items-center px-3 gap-2 overflow-hidden shadow-inner"
+                        style={{ backgroundColor: th.previewBg }}
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full shadow-sm"
+                          style={{ backgroundColor: th.accentColor }}
+                        />
+                        <span
+                          className="w-12 h-2.5 rounded-full"
+                          style={{ backgroundColor: th.previewPanel }}
+                        />
+                        <span
+                          className="w-6 h-2 rounded-full opacity-60"
+                          style={{ backgroundColor: th.accentSecondary }}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white">{th.name}</span>
+                          {isActive && <Check className="w-4 h-4 text-[#10B981]" />}
+                        </div>
+                        <p className="text-[10px] text-[#7F93B8] line-clamp-1 mt-0.5">
+                          {th.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

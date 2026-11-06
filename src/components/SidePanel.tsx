@@ -36,7 +36,7 @@ import {
   SceneItem,
   ThemeMode,
 } from '../types';
-import { I18N, SAMPLE_SYMBOLS, SYMBOL_CATEGORIES } from '../constants/theme';
+import { I18N, COLORS, SAMPLE_SYMBOLS, SYMBOL_CATEGORIES } from '../constants/theme';
 
 interface SidePanelProps {
   theme: ThemeMode;
@@ -67,8 +67,9 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   onUpdateObject,
   onStartPresenter,
 }) => {
+  const tokens = COLORS[theme] || COLORS.emerald;
   const isEmerald = theme === 'emerald';
-  const isDark = theme === 'dark' || isEmerald;
+  const isDark = theme !== 'light';
   const t = I18N[language];
   const [selectedCategory, setSelectedCategory] = useState('military');
   const [symbolSearch, setSymbolSearch] = useState('');
@@ -113,49 +114,39 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     }
   };
 
-  const getPanelBg = () => {
-    if (isEmerald) return 'bg-[#121E1C] border-[#203833] text-white shadow-2xl';
-    if (isDark) return 'bg-[#0F2147] border-[#2A4478] text-[#FFFFFF]';
-    return 'bg-[#F7F9FC] border-[#C3CCDA] text-[#0A1A3A]';
-  };
-
-  const cardBg = isEmerald
-    ? 'bg-[#172825] border-[#203833] text-white'
-    : isDark
-    ? 'bg-[#16305F] border-[#2A4478] text-white'
+  const cardBg = isDark
+    ? 'bg-black/20 border-white/10 text-white'
     : 'bg-[#FFFFFF] border-[#C3CCDA] text-[#0A1A3A]';
 
-  const cardHoverBg = isEmerald
-    ? 'bg-[#172825] hover:bg-[#1E332F] border-[#203833] hover:border-[#10B981]/60'
-    : isDark
-    ? 'bg-[#16305F]/80 hover:bg-[#16305F] border-[#2A4478]'
-    : 'bg-[#FFFFFF] hover:bg-[#F8FAFC] border-[#C3CCDA]';
+  const cardHoverBg = isDark
+    ? 'bg-black/20 hover:bg-black/35 border-white/10 hover:border-white/25 text-white'
+    : 'bg-[#FFFFFF] hover:bg-[#F8FAFC] border-[#C3CCDA] text-[#0A1A3A]';
 
-  const inputStyle = isEmerald
-    ? 'bg-[#172825] border-[#203833] text-white focus:border-[#10B981]'
-    : isDark
-    ? 'bg-[#16305F] border-[#2A4478] text-[#FFFFFF]'
+  const inputStyle = isDark
+    ? 'bg-black/30 border-white/15 text-white focus:border-white/40'
     : 'bg-[#FFFFFF] border-[#C3CCDA] text-[#0A1A3A]';
 
-  const primaryBtn = isEmerald
-    ? 'bg-[#10B981] hover:bg-[#059669] text-white shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-    : 'bg-[#3B6FD6] hover:bg-[#2F5DB8] text-[#FFFFFF]';
+  const primaryBtn = 'text-white shadow transition-all active:scale-95';
 
   return (
     <div
+      style={{
+        backgroundColor: tokens.panelBg,
+        borderColor: tokens.border,
+        color: tokens.textPrimary,
+      }}
       className={`${
         isPhone
           ? 'fixed inset-x-0 bottom-0 top-1/4 rounded-t-2xl shadow-2xl z-40'
           : isTabletPortrait
           ? 'fixed inset-x-0 bottom-0 h-1/2 rounded-t-2xl shadow-2xl z-40'
           : 'w-[320px] h-full border-l z-20 shrink-0'
-      } flex flex-col select-none transition-all ${getPanelBg()}`}
+      } flex flex-col select-none transition-all`}
     >
       {/* Panel Header */}
       <div
-        className={`h-12 px-4 flex items-center justify-between border-b shrink-0 ${
-          isEmerald ? 'border-[#203833]' : isDark ? 'border-[#2A4478]' : 'border-[#C3CCDA]'
-        }`}
+        style={{ borderColor: tokens.border }}
+        className="h-12 px-4 flex items-center justify-between border-b shrink-0"
       >
         <span className="font-bold text-sm truncate">{getPanelTitle()}</span>
         <button
@@ -330,6 +321,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
                   },
                 ]);
               }}
+              style={{ backgroundColor: tokens.interactionBlue }}
               className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow ${primaryBtn}`}
             >
               <Plus className="w-4 h-4" />
@@ -477,6 +469,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               </span>
               <button
                 onClick={() => onStartPresenter(0)}
+                style={{ backgroundColor: tokens.interactionBlue }}
                 className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 shadow ${primaryBtn}`}
               >
                 <Play className="w-3.5 h-3.5 fill-current" />

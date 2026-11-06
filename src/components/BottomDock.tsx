@@ -1,7 +1,7 @@
 import React from 'react';
 import { MousePointer2, Hand, PenTool, Layers, MoreHorizontal } from 'lucide-react';
 import { ActivePanel, ActiveTool, LanguageMode, ThemeMode } from '../types';
-import { I18N } from '../constants/theme';
+import { I18N, COLORS } from '../constants/theme';
 
 interface BottomDockProps {
   theme: ThemeMode;
@@ -24,36 +24,35 @@ export const BottomDock: React.FC<BottomDockProps> = ({
   onOpenDrawMenu,
   onOpenMoreMenu,
 }) => {
-  const isEmerald = theme === 'emerald';
-  const isDark = theme === 'dark' || isEmerald;
+  const tokens = COLORS[theme] || COLORS.emerald;
   const t = I18N[language];
-
-  const getDockBg = () => {
-    if (isEmerald) return 'bg-[#0F1A18] border-[#203833] text-white';
-    if (isDark) return 'bg-[#0F2147] border-[#2A4478] text-[#FFFFFF]';
-    return 'bg-[#E3E8F0] border-[#C3CCDA] text-[#0A1A3A]';
-  };
 
   const getBtnStyle = (isActive: boolean) => {
     if (isActive) {
-      if (isEmerald) return 'bg-[#10B981] text-white shadow-[0_0_10px_rgba(16,185,129,0.4)]';
-      return 'bg-[#3B6FD6] text-[#FFFFFF]';
+      return {
+        backgroundColor: tokens.interactionBlue,
+        color: '#FFFFFF',
+        boxShadow: `0 0 10px ${tokens.interactionBlue}50`,
+      };
     }
-    if (isEmerald) return 'text-[#9DBAB4] hover:bg-[#172825]';
-    if (isDark) return 'text-[#B8C4DC] hover:bg-[#16305F]';
-    return 'text-[#46546F] hover:bg-[#CBD5E1]';
+    return {
+      color: tokens.textSecondary,
+    };
   };
 
   return (
     <nav
-      className={`h-[56px] w-full border-t flex items-center justify-around px-2 z-30 shrink-0 transition-colors ${getDockBg()}`}
+      className="h-[56px] w-full border-t flex items-center justify-around px-2 z-30 shrink-0 transition-colors"
+      style={{
+        backgroundColor: tokens.railBg,
+        borderColor: tokens.border,
+      }}
     >
       {/* 1: Select */}
       <button
         onClick={() => onSelectTool('SELECT')}
-        className={`flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all ${getBtnStyle(
-          activeTool === 'SELECT'
-        )}`}
+        style={getBtnStyle(activeTool === 'SELECT')}
+        className="flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
       >
         <MousePointer2 className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">{t.tools.select}</span>
@@ -62,9 +61,8 @@ export const BottomDock: React.FC<BottomDockProps> = ({
       {/* 2: Pan */}
       <button
         onClick={() => onSelectTool('PAN')}
-        className={`flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all ${getBtnStyle(
-          activeTool === 'PAN'
-        )}`}
+        style={getBtnStyle(activeTool === 'PAN')}
+        className="flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
       >
         <Hand className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">{t.tools.pan}</span>
@@ -76,9 +74,8 @@ export const BottomDock: React.FC<BottomDockProps> = ({
           onSelectTool('DRAW');
           onOpenDrawMenu(e);
         }}
-        className={`flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all ${getBtnStyle(
-          activeTool === 'DRAW'
-        )}`}
+        style={getBtnStyle(activeTool === 'DRAW')}
+        className="flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
       >
         <PenTool className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">{t.tools.draw}</span>
@@ -87,9 +84,8 @@ export const BottomDock: React.FC<BottomDockProps> = ({
       {/* 4: Layers */}
       <button
         onClick={() => onTogglePanel(activePanel === 'LAYERS' ? 'NONE' : 'LAYERS')}
-        className={`flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all ${getBtnStyle(
-          activePanel === 'LAYERS'
-        )}`}
+        style={getBtnStyle(activePanel === 'LAYERS')}
+        className="flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
       >
         <Layers className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">{t.tools.layers}</span>
@@ -98,9 +94,8 @@ export const BottomDock: React.FC<BottomDockProps> = ({
       {/* 5: More */}
       <button
         onClick={onOpenMoreMenu}
-        className={`flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all ${getBtnStyle(
-          activePanel !== 'NONE' && activePanel !== 'LAYERS'
-        )}`}
+        style={getBtnStyle(activePanel !== 'NONE' && activePanel !== 'LAYERS')}
+        className="flex-1 h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
       >
         <MoreHorizontal className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">{t.tools.more}</span>

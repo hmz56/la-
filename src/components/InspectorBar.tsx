@@ -12,9 +12,11 @@ import {
   Type,
   ChevronDown,
   Sparkles,
+  Palette,
+  Check,
 } from 'lucide-react';
 import { LanguageMode, LayoutMode, ScreenId, ThemeMode } from '../types';
-import { I18N } from '../constants/theme';
+import { I18N, THEMES_LIST } from '../constants/theme';
 
 interface InspectorBarProps {
   layoutMode: LayoutMode;
@@ -46,6 +48,7 @@ export const InspectorBar: React.FC<InspectorBarProps> = ({
   setFontScale,
 }) => {
   const [screenMenuOpen, setScreenMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const t = I18N[language];
 
   const screens: { id: ScreenId; label: string }[] = [
@@ -199,46 +202,87 @@ export const InspectorBar: React.FC<InspectorBarProps> = ({
 
       {/* Right Controls: Theme, Language, Debug, Font Scale */}
       <div className="flex items-center gap-2">
-        {/* Theme Segment Selector */}
-        <div className="flex items-center gap-0.5 bg-[#0F2147] p-0.5 rounded-lg border border-[#2A4478]">
+        {/* Single Compact Theme Switcher Button */}
+        <div className="relative">
           <button
-            onClick={() => setTheme('emerald')}
-            title="Emerald Mint Theme (From Uploaded Image)"
-            className={`h-6 px-2 rounded flex items-center gap-1 text-[11px] font-bold transition-all ${
-              theme === 'emerald'
-                ? 'bg-[#10B981] text-white shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                : 'text-[#9DBAB4] hover:text-white'
-            }`}
+            onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+            title="Switch UI Color Theme"
+            className="h-7 px-2 rounded-lg bg-[#16305F] hover:bg-[#20407A] border border-[#2A4478] flex items-center gap-1.5 text-xs font-semibold text-white transition-all shadow"
           >
-            <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-            <span>Emerald</span>
+            <Palette className="w-3.5 h-3.5 text-[#10B981]" />
+            <span
+              className="w-2.5 h-2.5 rounded-full border border-white/20 shrink-0"
+              style={{
+                backgroundColor:
+                  THEMES_LIST.find((t) => t.id === theme)?.accentColor || '#10B981',
+              }}
+            />
+            <span className="hidden sm:inline text-[11px] font-bold">
+              {THEMES_LIST.find((t) => t.id === theme)?.name.split(' ')[0] || 'Theme'}
+            </span>
+            <ChevronDown className="w-3 h-3 text-[#7F93B8]" />
           </button>
 
-          <button
-            onClick={() => setTheme('dark')}
-            title="Navy Dark Theme"
-            className={`h-6 px-2 rounded flex items-center gap-1 text-[11px] font-medium transition-all ${
-              theme === 'dark'
-                ? 'bg-[#3B6FD6] text-white shadow'
-                : 'text-[#B8C4DC] hover:text-white'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-[#3B6FD6]" />
-            <span>Navy</span>
-          </button>
-
-          <button
-            onClick={() => setTheme('light')}
-            title="Cool Light Theme"
-            className={`h-6 px-2 rounded flex items-center gap-1 text-[11px] font-medium transition-all ${
-              theme === 'light'
-                ? 'bg-white text-[#0A1A3A] shadow font-bold'
-                : 'text-[#B8C4DC] hover:text-white'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-slate-300 border border-slate-500" />
-            <span>Light</span>
-          </button>
+          {themeMenuOpen && (
+            <div
+              className="fixed inset-0 z-50"
+              onClick={() => setThemeMenuOpen(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute top-10 right-20 w-80 max-h-[480px] overflow-y-auto rounded-xl bg-[#0F2147] border border-[#2A4478] shadow-2xl p-2 space-y-1 text-xs text-white z-50"
+              >
+                <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono text-[#7F93B8] uppercase border-b border-[#2A4478]">
+                  <span>UI Color Themes ({THEMES_LIST.length})</span>
+                  <span className="text-[#3B6FD6] font-bold">
+                    {THEMES_LIST.find((t) => t.id === theme)?.badge}
+                  </span>
+                </div>
+                {THEMES_LIST.map((th) => {
+                  const isActive = theme === th.id;
+                  return (
+                    <button
+                      key={th.id}
+                      onClick={() => {
+                        setTheme(th.id);
+                        setThemeMenuOpen(false);
+                      }}
+                      className={`w-full p-2 rounded-lg text-left flex items-start gap-2.5 transition-all ${
+                        isActive
+                          ? 'bg-[#16305F] border border-[#3B6FD6] shadow-sm'
+                          : 'hover:bg-[#16305F]/60 border border-transparent'
+                      }`}
+                    >
+                      <div
+                        className="w-7 h-7 rounded-lg border border-white/20 shrink-0 relative flex items-center justify-center overflow-hidden shadow-sm mt-0.5"
+                        style={{ backgroundColor: th.previewBg }}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: th.accentColor }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`font-bold text-xs ${
+                              isActive ? 'text-white' : 'text-[#B8C4DC]'
+                            }`}
+                          >
+                            {th.name}
+                          </span>
+                          {isActive && <Check className="w-3.5 h-3.5 text-[#10B981]" />}
+                        </div>
+                        <p className="text-[10px] text-[#7F93B8] line-clamp-1 leading-tight mt-0.5">
+                          {th.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Language Toggle (EN / AR RTL) */}

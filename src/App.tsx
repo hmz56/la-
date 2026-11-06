@@ -144,21 +144,55 @@ export default function App() {
     }
   };
 
-  const isEmerald = theme === 'emerald';
-  const isDark = theme === 'dark' || isEmerald;
+  const isLight = theme === 'light';
+  const isDark = !isLight;
   const isPhonePortrait = layoutMode === 'PHONE_PORTRAIT';
 
   const getContainerBg = () => {
-    if (isEmerald) return 'border-[#203833] bg-[#0A1312] shadow-[0_0_50px_rgba(16,185,129,0.12)]';
-    if (isDark) return 'border-[#2A4478] bg-[#0A1A3A]';
-    return 'border-[#C3CCDA] bg-[#EEF1F6]';
+    switch (theme) {
+      case 'emerald':
+        return 'border-[#203833] bg-[#0A1312] shadow-[0_0_50px_rgba(16,185,129,0.18)]';
+      case 'ops-black':
+        return 'border-[#1E293B] bg-[#05070A] shadow-[0_0_50px_rgba(56,189,248,0.2)]';
+      case 'charcoal':
+        return 'border-[#2F3138] bg-[#131416] shadow-[0_0_50px_rgba(0,0,0,0.8)]';
+      case 'crimson-night':
+        return 'border-[#2A1828] bg-[#070C16] shadow-[0_0_50px_rgba(239,68,68,0.2)]';
+      case 'titanium-stealth':
+        return 'border-[#33373F] bg-[#141517] shadow-[0_0_50px_rgba(148,163,184,0.15)]';
+      case 'dark':
+        return 'border-[#2A4478] bg-[#0A1A3A] shadow-[0_0_50px_rgba(59,111,214,0.18)]';
+      case 'light':
+      default:
+        return 'border-[#C3CCDA] bg-[#EEF1F6] shadow-2xl';
+    }
+  };
+
+  const getOuterBg = () => {
+    switch (theme) {
+      case 'emerald':
+        return 'bg-[#050C0B]';
+      case 'ops-black':
+        return 'bg-[#020305]';
+      case 'charcoal':
+        return 'bg-[#0C0D0E]';
+      case 'crimson-night':
+        return 'bg-[#03060C]';
+      case 'titanium-stealth':
+        return 'bg-[#0A0B0C]';
+      case 'dark':
+        return 'bg-[#050C1B]';
+      case 'light':
+      default:
+        return 'bg-[#DDE3ED]';
+    }
   };
 
   return (
     <div
-      className={`w-screen h-screen flex flex-col overflow-hidden font-sans ${
-        isEmerald ? 'bg-[#050C0B]' : 'bg-[#050C1B]'
-      } ${isDark ? 'dark' : ''}`}
+      className={`w-screen h-screen flex flex-col overflow-hidden font-sans ${getOuterBg()} ${
+        isDark ? 'dark' : ''
+      }`}
       style={{ fontSize: `${fontScale * 14}px` }}
     >
       {/* 1. Studio Inspector Toolbar (Allows full design switching across all screens & viewports) */}
@@ -178,7 +212,7 @@ export default function App() {
       />
 
       {/* 2. Device Viewport Canvas Centered in Workspace */}
-      <div className={`flex-1 w-full h-[calc(100vh-40px)] flex items-center justify-center p-0 md:p-3 overflow-hidden ${isEmerald ? 'bg-[#040908]' : 'bg-[#040814]'}`}>
+      <div className={`flex-1 w-full h-[calc(100vh-40px)] flex items-center justify-center p-0 md:p-3 overflow-hidden ${getOuterBg()}`}>
         <div
           className={`${getContainerStyles()} relative flex flex-col transition-all duration-200 ${getContainerBg()}`}
           dir={language === 'ar' ? 'rtl' : 'ltr'}

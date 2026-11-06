@@ -47,7 +47,14 @@ export type DrawingToolType =
 
 export type CoordinateFormat = 'DD' | 'DDM' | 'DMS' | 'UTM' | 'MGRS';
 
-export type ThemeMode = 'dark' | 'emerald' | 'light';
+export type ThemeMode =
+  | 'emerald'
+  | 'ops-black'
+  | 'charcoal'
+  | 'crimson-night'
+  | 'titanium-stealth'
+  | 'dark'
+  | 'light';
 
 export type BasemapMode = 'aerial' | 'emerald' | 'topo';
 

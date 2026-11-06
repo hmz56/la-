@@ -19,7 +19,7 @@ import {
   SaveState,
   ThemeMode,
 } from '../types';
-import { I18N } from '../constants/theme';
+import { I18N, COLORS } from '../constants/theme';
 
 interface TopStatusBarProps {
   theme: ThemeMode;
@@ -60,8 +60,9 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   canUndo = true,
   canRedo = false,
 }) => {
-  const isEmerald = theme === 'emerald';
-  const isDark = theme === 'dark' || isEmerald;
+  const isLight = theme === 'light';
+  const isDark = !isLight;
+  const tokens = COLORS[theme] || COLORS.emerald;
   const t = I18N[language];
   const isRTL = language === 'ar';
 
@@ -94,17 +95,15 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
       case 'searching':
         return 'text-[#F59E0B] animate-spin';
       case 'located':
-        return isEmerald ? 'text-[#10B981]' : isDark ? 'text-[#3DB57A]' : 'text-[#1E8E5A]';
+        return 'animate-none';
       case 'follow':
-        return isEmerald
-          ? 'text-[#10B981] fill-[#10B981] animate-pulse'
-          : 'text-[#3B6FD6] fill-[#3B6FD6] animate-pulse';
+        return 'animate-pulse';
       case 'denied':
         return 'text-[#F43F5E] opacity-70';
       case 'no_gnss':
         return 'text-gray-400 line-through';
       default:
-        return isEmerald ? 'text-[#9DBAB4]' : isDark ? 'text-[#B8C4DC]' : 'text-[#46546F]';
+        return 'opacity-80';
     }
   };
 
@@ -113,11 +112,11 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
       case 'SAVED':
         return (
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              isEmerald
-                ? 'bg-[#10B981] shadow-[0_0_8px_#10B981]'
-                : 'bg-[#3DB57A] shadow-[0_0_6px_#3DB57A]'
-            }`}
+            className="w-2.5 h-2.5 rounded-full shadow-sm"
+            style={{
+              backgroundColor: tokens.green || tokens.interactionBlue,
+              boxShadow: `0 0 8px ${tokens.green || tokens.interactionBlue}`,
+            }}
             title={t.saved}
           />
         );
@@ -148,23 +147,48 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
   const isPhone = layoutMode === 'PHONE_PORTRAIT' || layoutMode === 'PHONE_LANDSCAPE';
 
   const getHeaderBg = () => {
-    if (isEmerald) return 'bg-[#0F1A18] border-[#203833] text-white';
-    if (isDark) return 'bg-[#0A1A3A] border-[#2A4478] text-[#FFFFFF]';
-    return 'bg-[#E3E8F0] border-[#C3CCDA] text-[#0A1A3A]';
+    switch (theme) {
+      case 'emerald':
+        return 'bg-[#0F1A18] border-[#203833] text-white';
+      case 'ops-black':
+        return 'bg-[#090D14] border-[#1E293B] text-[#F8FAFC]';
+      case 'charcoal':
+        return 'bg-[#18191C] border-[#2E3037] text-white';
+      case 'crimson-night':
+        return 'bg-[#0B1220] border-[#1E2F52] text-white';
+      case 'titanium-stealth':
+        return 'bg-[#181A1D] border-[#33373F] text-[#F1F5F9]';
+      case 'dark':
+        return 'bg-[#0F2147] border-[#2A4478] text-[#FFFFFF]';
+      case 'light':
+      default:
+        return 'bg-[#E3E8F0] border-[#C3CCDA] text-[#0A1A3A]';
+    }
   };
 
   const getBtnHover = () => {
-    if (isEmerald) return 'hover:bg-[#172825] text-white';
-    if (isDark) return 'hover:bg-[#16305F] text-[#FFFFFF]';
-    return 'hover:bg-[#CBD5E1] text-[#0A1A3A]';
+    if (isLight) return 'hover:bg-[#CBD5E1] text-[#0A1A3A]';
+    return 'hover:bg-white/10 text-white';
   };
 
   const getChipStyle = () => {
-    if (isEmerald)
-      return 'bg-[#172825]/90 hover:bg-[#1F3330] text-[#9DBAB4] hover:text-white border-[#203833]';
-    if (isDark)
-      return 'bg-[#16305F]/80 hover:bg-[#16305F] text-[#B8C4DC] hover:text-[#FFFFFF] border-[#2A4478]';
-    return 'bg-[#FFFFFF]/90 hover:bg-[#FFFFFF] text-[#46546F] hover:text-[#0A1A3A] border-[#C3CCDA]';
+    switch (theme) {
+      case 'emerald':
+        return 'bg-[#172825]/90 hover:bg-[#1F3330] text-[#9DBAB4] hover:text-white border-[#203833]';
+      case 'ops-black':
+        return 'bg-[#121824]/90 hover:bg-[#182030] text-[#94A3B8] hover:text-white border-[#1E293B]';
+      case 'charcoal':
+        return 'bg-[#24252B]/90 hover:bg-[#2C2D35] text-[#A1A1AA] hover:text-white border-[#2E3037]';
+      case 'crimson-night':
+        return 'bg-[#131E33]/90 hover:bg-[#1A2844] text-[#94A3B8] hover:text-white border-[#1E2F52]';
+      case 'titanium-stealth':
+        return 'bg-[#24272E]/90 hover:bg-[#2D313A] text-[#94A3B8] hover:text-white border-[#33373F]';
+      case 'dark':
+        return 'bg-[#16305F]/80 hover:bg-[#16305F] text-[#B8C4DC] hover:text-[#FFFFFF] border-[#2A4478]';
+      case 'light':
+      default:
+        return 'bg-[#FFFFFF]/90 hover:bg-[#FFFFFF] text-[#46546F] hover:text-[#0A1A3A] border-[#C3CCDA]';
+    }
   };
 
   return (
@@ -198,7 +222,10 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
         title={t.coordSwitcher.title}
         className={`px-2.5 py-1 rounded-md text-xs font-mono font-medium flex items-center gap-1.5 transition-all border ${getChipStyle()}`}
       >
-        <Navigation className={`w-3.5 h-3.5 ${isEmerald ? 'text-[#10B981]' : 'text-[#3B6FD6]'} shrink-0`} />
+        <Navigation
+          className="w-3.5 h-3.5 shrink-0"
+          style={{ color: tokens.interactionBlue }}
+        />
         <span className="truncate">{getCoordinateString()}</span>
       </button>
 
@@ -213,7 +240,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
               className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
                 canUndo
                   ? isDark
-                    ? 'hover:bg-[#16305F] text-[#B8C4DC]'
+                    ? 'hover:bg-white/10 text-white/80'
                     : 'hover:bg-[#CBD5E1] text-[#46546F]'
                   : 'opacity-30 cursor-not-allowed'
               }`}
@@ -228,7 +255,7 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
               className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
                 canRedo
                   ? isDark
-                    ? 'hover:bg-[#16305F] text-[#B8C4DC]'
+                    ? 'hover:bg-white/10 text-white/80'
                     : 'hover:bg-[#CBD5E1] text-[#46546F]'
                   : 'opacity-30 cursor-not-allowed'
               }`}
@@ -242,22 +269,23 @@ export const TopStatusBar: React.FC<TopStatusBarProps> = ({
         <button
           onClick={onLocate}
           title={`GNSS Locate: ${locateState}`}
-          className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
-            isDark ? 'hover:bg-[#16305F]' : 'hover:bg-[#CBD5E1]'
-          }`}
+          className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${getBtnHover()}`}
         >
-          <Crosshair className={`w-4 h-4 ${getLocateIconStyle()}`} />
+          <Crosshair
+            className={`w-4 h-4 ${getLocateIconStyle()}`}
+            style={{ color: locateState === 'located' || locateState === 'follow' ? tokens.interactionBlue : undefined }}
+          />
         </button>
 
-        {/* Present Button */}
+        {/* Present Button with Theme Accent */}
         <button
           onClick={onPresent}
           title={t.present}
-          className={`h-8 px-3 rounded-md text-[#FFFFFF] text-xs font-semibold flex items-center gap-1.5 shadow transition-all active:scale-95 ${
-            isEmerald
-              ? 'bg-[#10B981] hover:bg-[#059669] shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-              : 'bg-[#3B6FD6] hover:bg-[#2F5DB8]'
-          }`}
+          className="h-8 px-3 rounded-md text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all active:scale-95"
+          style={{
+            backgroundColor: tokens.interactionBlue,
+            boxShadow: `0 0 14px ${tokens.interactionBlue}44`,
+          }}
         >
           <Play className="w-3.5 h-3.5 fill-current" />
           {!isPhone && <span>{t.present}</span>}

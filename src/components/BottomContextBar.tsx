@@ -4,12 +4,9 @@ import {
   X,
   Lock,
   Unlock,
-  Copy,
   Trash2,
   Sliders,
   Ruler,
-  Maximize,
-  Layers,
   Info,
 } from 'lucide-react';
 import {
@@ -20,7 +17,7 @@ import {
   MapObject,
   ThemeMode,
 } from '../types';
-import { I18N } from '../constants/theme';
+import { I18N, COLORS } from '../constants/theme';
 
 interface BottomContextBarProps {
   theme: ThemeMode;
@@ -51,30 +48,30 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
   onToggleLock,
   onOpenProperties,
 }) => {
-  const isEmerald = theme === 'emerald';
-  const isDark = theme === 'dark' || isEmerald;
+  const tokens = COLORS[theme] || COLORS.emerald;
   const t = I18N[language];
   const isPhone = layoutMode === 'PHONE_PORTRAIT' || layoutMode === 'PHONE_LANDSCAPE';
   const barHeight = isPhone ? 'h-[48px]' : 'h-[56px]';
 
-  const getBarBg = () => {
-    if (isEmerald) return 'bg-[#0F1A18] border-[#203833] text-white';
-    if (isDark) return 'bg-[#0F2147] border-[#2A4478] text-[#FFFFFF]';
-    return 'bg-[#E3E8F0] border-[#C3CCDA] text-[#0A1A3A]';
-  };
-
   return (
     <div
-      className={`${barHeight} w-full border-t px-4 flex items-center justify-between select-none z-20 shrink-0 transition-colors ${getBarBg()}`}
+      className={`${barHeight} w-full border-t px-4 flex items-center justify-between select-none z-20 shrink-0 transition-colors`}
+      style={{
+        backgroundColor: tokens.railBg,
+        borderColor: tokens.border,
+        color: tokens.textPrimary,
+      }}
     >
       {/* State 1: Active Drawing */}
       {drawingTool ? (
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isEmerald ? 'bg-[#10B981] shadow-[0_0_8px_#10B981]' : 'bg-[#3B6FD6]'
-              } animate-pulse`}
+              className="w-2.5 h-2.5 rounded-full animate-pulse"
+              style={{
+                backgroundColor: tokens.interactionBlue,
+                boxShadow: `0 0 8px ${tokens.interactionBlue}`,
+              }}
             />
             <span className="text-xs sm:text-sm font-semibold truncate">
               {t.drawTools[
@@ -83,9 +80,8 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
               ] || drawingTool}
             </span>
             <span
-              className={`text-xs ${
-                isEmerald ? 'text-[#7F9D96]' : 'text-[#B8C4DC]'
-              } hidden md:inline`}
+              className="text-xs hidden md:inline"
+              style={{ color: tokens.textSecondary }}
             >
               ({t.contextBar.drawingActive})
             </span>
@@ -101,11 +97,11 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
             </button>
             <button
               onClick={onFinishDrawing}
-              className={`h-8 px-3 rounded-lg text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all active:scale-95 ${
-                isEmerald
-                  ? 'bg-[#10B981] hover:bg-[#059669] shadow-[0_0_12px_rgba(16,185,129,0.35)]'
-                  : 'bg-[#3DB57A] hover:bg-[#349e6a]'
-              }`}
+              style={{
+                backgroundColor: tokens.interactionBlue,
+                boxShadow: `0 0 12px ${tokens.interactionBlue}40`,
+              }}
+              className="h-8 px-3 rounded-lg text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all active:scale-95"
             >
               <Check className="w-4 h-4" />
               <span>{t.contextBar.finishDraw}</span>
@@ -117,13 +113,12 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                isEmerald
-                  ? 'bg-[#10B981]/25 text-[#34D399] border border-[#10B981]/40'
-                  : isDark
-                  ? 'bg-[#3B6FD6]/30 text-[#9DBBF8]'
-                  : 'bg-[#3B6FD6]/20 text-[#2A55B0]'
-              }`}
+              className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0"
+              style={{
+                backgroundColor: `${tokens.interactionBlue}25`,
+                color: tokens.interactionBlue,
+                border: `1px solid ${tokens.interactionBlue}40`,
+              }}
             >
               {selectedObject.type}
             </span>
@@ -132,9 +127,8 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
             </span>
             {selectedObject.metrics?.area && (
               <span
-                className={`text-xs font-mono ${
-                  isEmerald ? 'text-[#7F9D96]' : 'text-[#7F93B8]'
-                } hidden sm:inline`}
+                className="text-xs font-mono hidden sm:inline"
+                style={{ color: tokens.textSecondary }}
               >
                 • {selectedObject.metrics.area}
               </span>
@@ -146,16 +140,16 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
             <button
               onClick={onOpenProperties}
               title={t.tools.properties}
-              className={`h-8 px-2.5 rounded-lg border text-xs font-medium flex items-center gap-1 transition-all ${
-                isEmerald
-                  ? 'bg-[#172825] border-[#203833] text-white hover:bg-[#1E332F]'
-                  : isDark
-                  ? 'bg-[#16305F] border-[#2A4478] text-[#FFFFFF] hover:bg-[#20407A]'
-                  : 'bg-[#FFFFFF] border-[#C3CCDA] text-[#0A1A3A] hover:bg-[#F1F5F9]'
-              }`}
+              style={{
+                backgroundColor: tokens.raisedCard,
+                borderColor: tokens.border,
+                color: tokens.textPrimary,
+              }}
+              className="h-8 px-2.5 rounded-lg border text-xs font-medium flex items-center gap-1 transition-all hover:opacity-90"
             >
               <Sliders
-                className={`w-3.5 h-3.5 ${isEmerald ? 'text-[#10B981]' : 'text-[#3B6FD6]'}`}
+                className="w-3.5 h-3.5"
+                style={{ color: tokens.interactionBlue }}
               />
               <span className="hidden sm:inline">{t.contextBar.style}</span>
             </button>
@@ -164,13 +158,8 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
             <button
               onClick={() => onToggleLock(selectedObject.id)}
               title={selectedObject.locked ? t.contextBar.unlock : t.contextBar.lock}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                isEmerald
-                  ? 'hover:bg-[#172825] text-[#9DBAB4]'
-                  : isDark
-                  ? 'hover:bg-[#16305F] text-[#B8C4DC]'
-                  : 'hover:bg-[#CBD5E1] text-[#46546F]'
-              }`}
+              style={{ color: tokens.textSecondary }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
             >
               {selectedObject.locked ? (
                 <Lock className="w-4 h-4 text-[#F59E0B]" />
@@ -192,13 +181,8 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
             <button
               onClick={onDeselect}
               title={t.contextBar.deselect}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                isEmerald
-                  ? 'hover:bg-[#172825] text-[#9DBAB4]'
-                  : isDark
-                  ? 'hover:bg-[#16305F] text-[#B8C4DC]'
-                  : 'hover:bg-[#CBD5E1] text-[#46546F]'
-              }`}
+              style={{ color: tokens.textSecondary }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
             >
               <X className="w-4 h-4" />
             </button>
@@ -208,30 +192,28 @@ export const BottomContextBar: React.FC<BottomContextBarProps> = ({
         /* State 3: Idle state */
         <div className="flex items-center justify-between w-full">
           <div
-            className={`flex items-center gap-2 text-xs ${
-              isEmerald ? 'text-[#7F9D96]' : 'text-[#7F93B8]'
-            }`}
+            className="flex items-center gap-2 text-xs"
+            style={{ color: tokens.textSecondary }}
           >
             <Info
-              className={`w-4 h-4 ${isEmerald ? 'text-[#10B981]' : 'text-[#3B6FD6]'} shrink-0`}
+              className="w-4 h-4 shrink-0"
+              style={{ color: tokens.interactionBlue }}
             />
-            <span>Select an object to inspect metrics, or choose a Draw tool from the rail</span>
+            <span className="truncate">Select an object to inspect metrics, or choose a Draw tool from the rail</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => alert('Measurement mode active')}
-              className={`h-7 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                isEmerald
-                  ? 'bg-[#172825] text-[#9DBAB4] hover:bg-[#1E332F] border border-[#203833]'
-                  : isDark
-                  ? 'bg-[#16305F] text-[#B8C4DC] hover:bg-[#20407A]'
-                  : 'bg-[#FFFFFF] text-[#46546F] hover:bg-[#F1F5F9]'
-              }`}
+            <div
+              style={{
+                backgroundColor: tokens.raisedCard,
+                color: tokens.textSecondary,
+                borderColor: tokens.border,
+              }}
+              className="h-7 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 border"
             >
               <Ruler className="w-3.5 h-3.5" />
               <span>{t.contextBar.measure}</span>
-            </button>
+            </div>
           </div>
         </div>
       )}

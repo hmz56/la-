@@ -1,25 +1,109 @@
-import { LayerItem, MapObject, ProjectItem, SceneItem } from '../types';
+import { LayerItem, MapObject, ProjectItem, SceneItem, ThemeMode } from '../types';
 
-export const COLORS = {
-  dark: {
-    appBg: '#0A1A3A',
-    railBg: '#0F2147',
-    panelBg: '#0F2147',
-    raisedCard: '#16305F',
-    border: '#2A4478',
-    toolTile: '#4D4B49',
-    toolTileHover: '#5E574D',
-    interactionBlue: '#3B6FD6',
-    interactionBluePressed: '#2F5DB8',
-    alertRed: '#E3201B',
-    amber: '#F6B800',
-    green: '#3DB57A',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8C4DC',
-    textTertiary: '#7F93B8',
-    textBlue: '#9DBBF8',
-    textRed: '#FF9A90',
+export interface ThemeMeta {
+  id: ThemeMode;
+  name: string;
+  subtitle: string;
+  badge: string;
+  previewBg: string;
+  previewPanel: string;
+  accentColor: string;
+  accentSecondary: string;
+}
+
+export const THEMES_LIST: ThemeMeta[] = [
+  {
+    id: 'emerald',
+    name: 'Tactical Emerald',
+    subtitle: 'Deep forest matte with neon mint accents (SAAS 2024)',
+    badge: 'SAAS Emerald',
+    previewBg: '#0A1312',
+    previewPanel: '#12201D',
+    accentColor: '#10B981',
+    accentSecondary: '#34D399',
   },
+  {
+    id: 'ops-black',
+    name: 'Tactical Ops HUD',
+    subtitle: 'Pitch-black telemetry with cyan & coral hazards (Drone Ops)',
+    badge: 'Drone HUD',
+    previewBg: '#05070A',
+    previewPanel: '#0D121B',
+    accentColor: '#38BDF8',
+    accentSecondary: '#F87171',
+  },
+  {
+    id: 'charcoal',
+    name: 'Slate Charcoal',
+    subtitle: 'Warm minimal obsidian with clean subtle borders (OutletBuddy)',
+    badge: 'Obsidian Minimal',
+    previewBg: '#131416',
+    previewPanel: '#1C1D21',
+    accentColor: '#10B981',
+    accentSecondary: '#A1A1AA',
+  },
+  {
+    id: 'crimson-night',
+    name: 'Cyber Defense',
+    subtitle: 'Midnight navy with warning crimson & radar cyan (AA-2119)',
+    badge: 'Cyber Radar',
+    previewBg: '#070C16',
+    previewPanel: '#0E1728',
+    accentColor: '#EF4444',
+    accentSecondary: '#38BDF8',
+  },
+  {
+    id: 'titanium-stealth',
+    name: 'Titanium Stealth',
+    subtitle: 'Monolithic matte titanium & wireframe telemetry (SurveiTrack)',
+    badge: 'Titanium Monolith',
+    previewBg: '#141517',
+    previewPanel: '#1D2024',
+    accentColor: '#10B981',
+    accentSecondary: '#94A3B8',
+  },
+  {
+    id: 'dark',
+    name: 'Command Navy',
+    subtitle: 'Classic military deep navy & airforce blue (Original)',
+    badge: 'MIL-STD Navy',
+    previewBg: '#0A1A3A',
+    previewPanel: '#0F2147',
+    accentColor: '#3B6FD6',
+    accentSecondary: '#9DBBF8',
+  },
+  {
+    id: 'light',
+    name: 'High-Vis Light',
+    subtitle: 'Sunlight-readable high-contrast daylight mode',
+    badge: 'Daylight Ops',
+    previewBg: '#EEF1F6',
+    previewPanel: '#F7F9FC',
+    accentColor: '#2A55B0',
+    accentSecondary: '#46546F',
+  },
+];
+
+export const COLORS: Record<ThemeMode, {
+  appBg: string;
+  railBg: string;
+  panelBg: string;
+  raisedCard: string;
+  border: string;
+  borderGlow: string;
+  toolTile: string;
+  toolTileHover: string;
+  interactionBlue: string;
+  interactionBluePressed: string;
+  alertRed: string;
+  amber: string;
+  green: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  textBlue: string;
+  textRed: string;
+}> = {
   emerald: {
     appBg: '#0A1312',
     railBg: '#0F1A18',
@@ -34,13 +118,111 @@ export const COLORS = {
     alertRed: '#F43F5E',
     amber: '#F59E0B',
     green: '#10B981',
-    magenta: '#E879F9',
-    cyan: '#38BDF8',
     textPrimary: '#FFFFFF',
     textSecondary: '#9DBAB4',
     textTertiary: '#60857E',
     textBlue: '#34D399',
     textRed: '#FDA4AF',
+  },
+  'ops-black': {
+    appBg: '#05070A',
+    railBg: '#090D14',
+    panelBg: '#0D121B',
+    raisedCard: '#121824',
+    border: '#1E293B',
+    borderGlow: '#38BDF8',
+    toolTile: '#151D2C',
+    toolTileHover: '#1E293B',
+    interactionBlue: '#38BDF8',
+    interactionBluePressed: '#0284C7',
+    alertRed: '#EF4444',
+    amber: '#FBBF24',
+    green: '#34D399',
+    textPrimary: '#F8FAFC',
+    textSecondary: '#94A3B8',
+    textTertiary: '#64748B',
+    textBlue: '#38BDF8',
+    textRed: '#F87171',
+  },
+  charcoal: {
+    appBg: '#131416',
+    railBg: '#18191C',
+    panelBg: '#1C1D21',
+    raisedCard: '#24252B',
+    border: '#2E3037',
+    borderGlow: '#10B981',
+    toolTile: '#25272D',
+    toolTileHover: '#2E3038',
+    interactionBlue: '#10B981',
+    interactionBluePressed: '#059669',
+    alertRed: '#F43F5E',
+    amber: '#F59E0B',
+    green: '#10B981',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#A1A1AA',
+    textTertiary: '#71717A',
+    textBlue: '#34D399',
+    textRed: '#FDA4AF',
+  },
+  'crimson-night': {
+    appBg: '#070C16',
+    railBg: '#0B1220',
+    panelBg: '#0E1728',
+    raisedCard: '#131E33',
+    border: '#1E2F52',
+    borderGlow: '#EF4444',
+    toolTile: '#172238',
+    toolTileHover: '#1E2E4C',
+    interactionBlue: '#EF4444',
+    interactionBluePressed: '#DC2626',
+    alertRed: '#EF4444',
+    amber: '#F59E0B',
+    green: '#10B981',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#94A3B8',
+    textTertiary: '#64748B',
+    textBlue: '#38BDF8',
+    textRed: '#EF4444',
+  },
+  'titanium-stealth': {
+    appBg: '#141517',
+    railBg: '#181A1D',
+    panelBg: '#1D2024',
+    raisedCard: '#24272E',
+    border: '#33373F',
+    borderGlow: '#94A3B8',
+    toolTile: '#262930',
+    toolTileHover: '#30343D',
+    interactionBlue: '#10B981',
+    interactionBluePressed: '#059669',
+    alertRed: '#EF4444',
+    amber: '#F59E0B',
+    green: '#10B981',
+    textPrimary: '#F1F5F9',
+    textSecondary: '#94A3B8',
+    textTertiary: '#64748B',
+    textBlue: '#E2E8F0',
+    textRed: '#F87171',
+  },
+  dark: {
+    appBg: '#0A1A3A',
+    railBg: '#0F2147',
+    panelBg: '#0F2147',
+    raisedCard: '#16305F',
+    border: '#2A4478',
+    borderGlow: '#3B6FD6',
+    toolTile: '#4D4B49',
+    toolTileHover: '#5E574D',
+    interactionBlue: '#3B6FD6',
+    interactionBluePressed: '#2F5DB8',
+    alertRed: '#E3201B',
+    amber: '#F6B800',
+    green: '#3DB57A',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8C4DC',
+    textTertiary: '#7F93B8',
+    textBlue: '#9DBBF8',
+    textRed: '#FF9A90',
   },
   light: {
     appBg: '#EEF1F6',
@@ -48,6 +230,7 @@ export const COLORS = {
     panelBg: '#F7F9FC',
     raisedCard: '#FFFFFF',
     border: '#C3CCDA',
+    borderGlow: '#2A55B0',
     toolTile: '#D3DAE7',
     toolTileHover: '#BFCADA',
     interactionBlue: '#2A55B0',
